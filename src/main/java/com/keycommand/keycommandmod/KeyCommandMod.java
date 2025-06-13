@@ -146,6 +146,8 @@ public class KeyCommandMod {
             DailyItems.add("/res tp wrx");DailyItemNames.add("传温柔");
             DailyItems.add("/res tp pxxd");DailyItemNames.add("传破晓");
             DailyItems.add("path:破晓"); DailyItemNames.add("跑破晓");
+            DailyItems.add("/res tp baonu");DailyItemNames.add("传暴怒");
+            DailyItems.add("path:暴怒"); DailyItemNames.add("跑暴怒");
             
             categoryItems.put("每日", DailyItems);
             categoryItemNames.put("每日", DailyItemNames);
@@ -308,10 +310,11 @@ public class KeyCommandMod {
         // 初始化路径序列管理器 - 支持多步操作
         private void initializePathSequences() {
             
-            // 设置角度（与游戏中对应） setPlayerViewAngles(player, 135.0f, 20.0f)
-            // 发送聊天内容（可用于发送指令） sendChatCommand("/jump")
-            // 指定坐标右键 rightClickOnBlock(player, new BlockPos(190, 8, -488))
-            
+            // 设置角度（与游戏中对应） xxx.addAction(player -> setPlayerViewAngles(player, 66.5f, -46.0f));
+            // 发送聊天内容（可用于发送指令） xxx.addAction(player -> sendChatCommand("/jump"));
+            // 指定坐标右键 xxx.addAction(player -> rightClickOnBlock(player, new BlockPos(190, 8, -488)));
+            // 手动添加延迟ticks（1tick = 50ms） xxx.addAction(new DelayAction(10)); 
+        	
             // 破晓路径序列
             PathSequence morningSequence = new PathSequence("破晓");
 
@@ -413,6 +416,98 @@ public class KeyCommandMod {
             morningSequence.addStep(morning24);
 
             pathSequenceManager.addSequence(morningSequence);
+
+            // 暴怒路径序列
+            PathSequence angerSequence = new PathSequence("暴怒");
+            
+            PathStep anger1 = new PathStep(new double[]{-43, 85, -34});
+            anger1.addAction(player -> rightClickOnBlock(player, new BlockPos(-44, 86, -34)));
+            
+            PathStep anger2 = new PathStep(new double[]{-44, 17, -59});
+            anger2.addAction(player -> rightClickOnBlock(player, new BlockPos(-43, 18, -59)));
+            anger2.addAction(new DelayAction(10)); 
+            anger2.addAction(player -> setPlayerViewAngles(player, -76.8f, -13.7f));
+            anger2.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger3 = new PathStep(new double[]{57, 47, -36});
+            anger3.addAction(player -> rightClickOnBlock(player, new BlockPos(60, 46, -37)));
+            anger3.addAction(new DelayAction(10)); 
+            anger3.addAction(player -> setPlayerViewAngles(player, 55.8f, -57.0f));
+            anger3.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger4 = new PathStep(new double[]{-1, 90, 37});
+            anger4.addAction(player -> rightClickOnBlock(player, new BlockPos(-2, 91, 38)));
+            
+            PathStep anger5 = new PathStep(new double[]{-35, 35, 23});
+            anger5.addAction(player -> rightClickOnBlock(player, new BlockPos(-34, 35, 23)));
+            anger5.addAction(new DelayAction(10)); 
+            anger5.addAction(player -> setPlayerViewAngles(player, -35.0f, -66.0f));
+            anger5.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger6 = new PathStep(new double[]{-14, 97, 67});
+            anger6.addAction(player -> setPlayerViewAngles(player, 128.0f, -24.0f));
+            anger6.addAction(player -> sendChatCommand("/jump"));
+            anger6.addAction(player -> rightClickOnBlock(player, new BlockPos(-20, 106, 63)));
+            anger6.addAction(new DelayAction(10)); 
+            anger6.addAction(player -> setPlayerViewAngles(player, -90.0f, 30.0f));
+            anger6.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger7 = new PathStep(new double[]{67, 26, 59});
+            anger7.addAction(player -> rightClickOnBlock(player, new BlockPos(65, 27, 57)));
+            anger7.addAction(new DelayAction(10)); 
+            anger7.addAction(player -> setPlayerViewAngles(player, 115.0f, -60.0f));
+            anger7.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger8 = new PathStep(new double[]{-25, 106, 102});
+            anger8.addAction(player -> rightClickOnBlock(player, new BlockPos(-28, 107, 102)));
+            
+            PathStep anger9 = new PathStep(new double[]{-30, 117, 124});
+            anger9.addAction(player -> rightClickOnBlock(player, new BlockPos(-30, 120, 127)));
+            
+            PathStep anger10 = new PathStep(new double[]{-32, 128, 111});
+            anger10.addAction(player -> rightClickOnBlock(player, new BlockPos(-31, 130, 108)));
+            
+            PathStep anger11a = new PathStep(new double[]{-19, 110, 110});
+            anger11a.addAction(player -> setPlayerViewAngles(player, -80.0f, 55.0f));
+            anger11a.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger11b = new PathStep(new double[]{6, 78, 114});
+            anger11b.addAction(player -> rightClickOnBlock(player, new BlockPos(6, 79, 115)));
+            
+            PathStep anger12 = new PathStep(new double[]{8, 57, 121});
+            anger12.addAction(player -> rightClickOnBlock(player, new BlockPos(10, 57, 119)));
+            
+            PathStep anger13 = new PathStep(new double[]{47, 19, 145});
+            anger13.addAction(new DelayAction(10)); 
+            anger13.addAction(player -> setPlayerViewAngles(player, -130.0f, -23.5f));
+            anger13.addAction(player -> sendChatCommand("/jump"));
+            anger13.addAction(player -> rightClickOnBlock(player, new BlockPos(53, 25, 140)));
+            
+            PathStep anger14a = new PathStep(new double[]{61, 19, 136});
+            anger14a.addAction(player -> setPlayerViewAngles(player, -55.0f, -85.0f));
+            anger14a.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep anger14b = new PathStep(new double[]{71, 77, 169});
+            anger14b.addAction(player -> rightClickOnBlock(player, new BlockPos(72, 77, 171)));
+            
+            angerSequence.addStep(anger1);
+            angerSequence.addStep(anger2);
+            angerSequence.addStep(anger3);
+            angerSequence.addStep(anger4);
+            angerSequence.addStep(anger5);
+            angerSequence.addStep(anger6);
+            angerSequence.addStep(anger7);
+            angerSequence.addStep(anger8);
+            angerSequence.addStep(anger9);
+            angerSequence.addStep(anger10);
+            angerSequence.addStep(anger11a);
+            angerSequence.addStep(anger11b);
+            angerSequence.addStep(anger12);
+            angerSequence.addStep(anger13);
+            angerSequence.addStep(anger14a);
+            angerSequence.addStep(anger14b);
+
+            pathSequenceManager.addSequence(angerSequence);
         }
         
         // 设置玩家视角角度
@@ -443,6 +538,24 @@ public class KeyCommandMod {
             );
             player.swingArm(EnumHand.MAIN_HAND);
             LOGGER.info("Right clicked at: " + pos);
+        }
+        
+        // 延迟动作类
+        private static class DelayAction implements Consumer<EntityPlayerSP> {
+        	private final int delayTicks;
+
+        	public DelayAction(int delayTicks) {
+        		this.delayTicks = delayTicks;
+        	}
+
+        	@Override
+        	public void accept(EntityPlayerSP player) {
+        		// 延迟动作本身在tick事件中处理，这里不执行任何操作
+        	}
+
+        	public int getDelayTicks() {
+        	return delayTicks;
+        	}
         }
         
         // 路径序列步骤类（支持多操作）
@@ -839,9 +952,21 @@ public class KeyCommandMod {
                         return;
                     }
                     
-                    // 执行当前动作
+                    // 获取当前动作
+                    Consumer<EntityPlayerSP> action = actions.get(actionIndex);
+                    
+                    // 处理延迟动作
+                    if (action instanceof GuiInventory.DelayAction) {
+                    	GuiInventory.DelayAction delayAction = (GuiInventory.DelayAction) action;
+                    	tickDelay = delayAction.getDelayTicks();
+                    	LOGGER.info("Delaying for {} ticks", tickDelay);
+                    	// 移动至下一个动作
+                    	actionIndex++;
+                    	return; // 等待延迟期间，直接返回
+                    }
+                    
+                    // 执行动作
                     try {
-                        Consumer<EntityPlayerSP> action = actions.get(actionIndex);
                         action.accept(player);
                         LOGGER.info("Executed action {} for step {}", actionIndex, currentStepIndex);
                     } catch (Exception e) {

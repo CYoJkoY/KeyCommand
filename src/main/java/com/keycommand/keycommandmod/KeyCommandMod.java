@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @Mod(modid = KeyCommandMod.MODID, name = KeyCommandMod.NAME, version = KeyCommandMod.VERSION)
 public class KeyCommandMod {
@@ -304,35 +305,188 @@ public class KeyCommandMod {
             categoryItemNames.put("传送", TeleportItemNames);
         }
 
-        // 初始化路径序列管理器
+        // 初始化路径序列管理器 - 支持多步操作
         private void initializePathSequences() {
+            
+            // 设置角度（与游戏中对应） setPlayerViewAngles(player, 135.0f, 20.0f)
+            // 发送聊天内容（可用于发送指令） sendChatCommand("/jump")
+            // 指定坐标右键 rightClickOnBlock(player, new BlockPos(190, 8, -488))
+            
             // 破晓路径序列
             PathSequence morningSequence = new PathSequence("破晓");
-            morningSequence.addPoint(new double[]{189, 6, -486}, new BlockPos(190, 8, -488));  //1
-            morningSequence.addPoint(new double[]{142, 6, -475}, new BlockPos(141, 8, -473));  //2
-            morningSequence.addPoint(new double[]{175, 6, -566}, new BlockPos(173, 8, -567));  //3
-            morningSequence.addPoint(new double[]{264, 6, -570}, new BlockPos(266, 8, -571));  //4
-            morningSequence.addPoint(new double[]{310, 6, -627}, new BlockPos(309, 8, -629));  //5
-            morningSequence.addPoint(new double[]{348, 6, -579}, new BlockPos(346, 8, -581));  //6
-            morningSequence.addPoint(new double[]{357, 6, -548}, new BlockPos(355, 8, -550));  //7
-            morningSequence.addPoint(new double[]{367, 6, -547}, new BlockPos(369, 8, -548));  //8
-            morningSequence.addPoint(new double[]{411, 6, -587}, new BlockPos(412, 8, -589));  //9
-            morningSequence.addPoint(new double[]{455, 6, -561}, new BlockPos(454, 8, -558));  //10
-            morningSequence.addPoint(new double[]{463, 7, -479}, new BlockPos(466, 9, -480));  //11
-            morningSequence.addPoint(new double[]{430, 6, -479}, new BlockPos(432, 8, -478));  //12
-            morningSequence.addPoint(new double[]{381, 6, -483}, new BlockPos(379, 7, -482));  //13
-            morningSequence.addPoint(new double[]{312, 8, -480}, new BlockPos(311, 10, -482));  //14
-            morningSequence.addPoint(new double[]{368, 6, -409}, new BlockPos(370, 7, -407));  //15
-            morningSequence.addPoint(new double[]{354, 6, -394}, new BlockPos(352, 7, -391));  //16
-            morningSequence.addPoint(new double[]{378, 13, -395}, new BlockPos(380, 14, -394));  //17
-            morningSequence.addPoint(new double[]{345, 13, -398}, new BlockPos(343, 14, -399));  //18
-            morningSequence.addPoint(new double[]{394, 6, -372}, new BlockPos(393, 8, -369));  //19
-            morningSequence.addPoint(new double[]{438, 6, -400}, new BlockPos(440, 7, -399));  //20
-            morningSequence.addPoint(new double[]{317, 6, -386}, new BlockPos(320, 8, -386));  //21
-            morningSequence.addPoint(new double[]{310, 6, -318}, new BlockPos(310, 8, -315));  //22
-            morningSequence.addPoint(new double[]{266, 6, -363}, new BlockPos(267, 8, -360));  //23
-            morningSequence.addPoint(new double[]{192, 6, -366}, new BlockPos(191, 8, -364));  //24
+
+            PathStep morning1 = new PathStep(new double[]{189, 6, -486});
+            morning1.addAction(player -> rightClickOnBlock(player, new BlockPos(190, 8, -488)));
+
+            PathStep morning2 = new PathStep(new double[]{142, 6, -475});
+            morning2.addAction(player -> rightClickOnBlock(player, new BlockPos(141, 8, -473)));
+
+            PathStep morning3 = new PathStep(new double[]{175, 6, -566});
+            morning3.addAction(player -> rightClickOnBlock(player, new BlockPos(173, 8, -567)));
+
+            PathStep morning4 = new PathStep(new double[]{264, 6, -570});
+            morning4.addAction(player -> rightClickOnBlock(player, new BlockPos(266, 8, -571)));
+
+            PathStep morning5 = new PathStep(new double[]{310, 6, -627});
+            morning5.addAction(player -> rightClickOnBlock(player, new BlockPos(309, 8, -629)));
+
+            PathStep morning6 = new PathStep(new double[]{348, 6, -579});
+            morning6.addAction(player -> rightClickOnBlock(player, new BlockPos(346, 8, -581)));
+
+            PathStep morning7 = new PathStep(new double[]{357, 6, -548});
+            morning7.addAction(player -> rightClickOnBlock(player, new BlockPos(355, 8, -550)));
+
+            PathStep morning8 = new PathStep(new double[]{367, 6, -547});
+            morning8.addAction(player -> rightClickOnBlock(player, new BlockPos(369, 8, -548)));
+
+            PathStep morning9 = new PathStep(new double[]{411, 6, -587});
+            morning9.addAction(player -> rightClickOnBlock(player, new BlockPos(412, 8, -589)));
+
+            PathStep morning10 = new PathStep(new double[]{455, 6, -561});
+            morning10.addAction(player -> rightClickOnBlock(player, new BlockPos(454, 8, -558)));
+
+            PathStep morning11 = new PathStep(new double[]{463, 7, -479});
+            morning11.addAction(player -> rightClickOnBlock(player, new BlockPos(466, 9, -480)));
+
+            PathStep morning12 = new PathStep(new double[]{430, 6, -479});
+            morning12.addAction(player -> rightClickOnBlock(player, new BlockPos(432, 8, -478)));
+
+            PathStep morning13 = new PathStep(new double[]{381, 6, -483});
+            morning13.addAction(player -> rightClickOnBlock(player, new BlockPos(379, 7, -482)));
+
+            PathStep morning14 = new PathStep(new double[]{312, 8, -480});
+            morning14.addAction(player -> rightClickOnBlock(player, new BlockPos(311, 10, -482)));
+
+            PathStep morning15 = new PathStep(new double[]{368, 6, -409});
+            morning15.addAction(player -> rightClickOnBlock(player, new BlockPos(370, 7, -407)));
+
+            PathStep morning16 = new PathStep(new double[]{354, 6, -394});
+            morning16.addAction(player -> rightClickOnBlock(player, new BlockPos(352, 7, -391)));
+
+            PathStep morning17 = new PathStep(new double[]{378, 13, -395});
+            morning17.addAction(player -> rightClickOnBlock(player, new BlockPos(380, 14, -394)));
+
+            PathStep morning18 = new PathStep(new double[]{345, 13, -398});
+            morning18.addAction(player -> rightClickOnBlock(player, new BlockPos(343, 14, -399)));
+
+            PathStep morning19 = new PathStep(new double[]{394, 6, -372});
+            morning19.addAction(player -> rightClickOnBlock(player, new BlockPos(393, 8, -369)));
+
+            PathStep morning20 = new PathStep(new double[]{438, 6, -400});
+            morning20.addAction(player -> rightClickOnBlock(player, new BlockPos(440, 7, -399)));
+
+            PathStep morning21 = new PathStep(new double[]{317, 6, -386});
+            morning21.addAction(player -> rightClickOnBlock(player, new BlockPos(320, 8, -386)));
+
+            PathStep morning22 = new PathStep(new double[]{310, 6, -318});
+            morning22.addAction(player -> rightClickOnBlock(player, new BlockPos(310, 8, -315)));
+
+            PathStep morning23 = new PathStep(new double[]{266, 6, -363});
+            morning23.addAction(player -> rightClickOnBlock(player, new BlockPos(267, 8, -360)));
+
+            PathStep morning24 = new PathStep(new double[]{192, 6, -366});
+            morning24.addAction(player -> rightClickOnBlock(player, new BlockPos(191, 8, -364)));
+
+            morningSequence.addStep(morning1);
+            morningSequence.addStep(morning2);
+            morningSequence.addStep(morning3);
+            morningSequence.addStep(morning4);
+            morningSequence.addStep(morning5);
+            morningSequence.addStep(morning6);
+            morningSequence.addStep(morning7);
+            morningSequence.addStep(morning8);
+            morningSequence.addStep(morning9);
+            morningSequence.addStep(morning10);
+            morningSequence.addStep(morning11);
+            morningSequence.addStep(morning12);
+            morningSequence.addStep(morning13);
+            morningSequence.addStep(morning14);
+            morningSequence.addStep(morning15);
+            morningSequence.addStep(morning16);
+            morningSequence.addStep(morning17);
+            morningSequence.addStep(morning18);
+            morningSequence.addStep(morning19);
+            morningSequence.addStep(morning20);
+            morningSequence.addStep(morning21);
+            morningSequence.addStep(morning22);
+            morningSequence.addStep(morning23);
+            morningSequence.addStep(morning24);
+
             pathSequenceManager.addSequence(morningSequence);
+        }
+        
+        // 设置玩家视角角度
+        private void setPlayerViewAngles(EntityPlayerSP player, float yaw, float pitch) {
+            player.rotationYaw = yaw;
+            player.rotationPitch = pitch;
+            player.rotationYawHead = yaw;
+            player.prevRotationYaw = yaw;
+            player.prevRotationPitch = pitch;
+            LOGGER.info("Set player view angles: yaw={}, pitch={}", yaw, pitch);
+        }
+        
+        // 发送聊天命令
+        private void sendChatCommand(String command) {
+            if (mc.player != null && !mc.player.isSpectator()) {
+                mc.player.sendChatMessage(command);
+                LOGGER.info("Sent command: " + command);
+            }
+        }
+        
+        // 右键点击方块
+        private void rightClickOnBlock(EntityPlayerSP player, BlockPos pos) {
+            EnumFacing facing = EnumFacing.UP;
+            Vec3d hitVec = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+            
+            mc.playerController.processRightClickBlock(
+                player, mc.world, pos, facing, hitVec, EnumHand.MAIN_HAND
+            );
+            player.swingArm(EnumHand.MAIN_HAND);
+            LOGGER.info("Right clicked at: " + pos);
+        }
+        
+        // 路径序列步骤类（支持多操作）
+        private static class PathStep {
+            private final double[] gotoPoint;
+            private final List<Consumer<EntityPlayerSP>> actions = new ArrayList<>();
+            
+            public PathStep(double[] gotoPoint) {
+                this.gotoPoint = gotoPoint;
+            }
+            
+            public void addAction(Consumer<EntityPlayerSP> action) {
+                actions.add(action);
+            }
+            
+            public double[] getGotoPoint() {
+                return gotoPoint;
+            }
+            
+            public List<Consumer<EntityPlayerSP>> getActions() {
+                return actions;
+            }
+        }
+        
+        // 路径序列类（支持多步骤）
+        private static class PathSequence {
+            private final String name;
+            private final List<PathStep> steps = new ArrayList<>();
+            
+            public PathSequence(String name) {
+                this.name = name;
+            }
+            
+            public void addStep(PathStep step) {
+                steps.add(step);
+            }
+            
+            public String getName() {
+                return name;
+            }
+            
+            public List<PathStep> getSteps() {
+                return steps;
+            }
         }
         
         // 路径序列管理器
@@ -352,54 +506,24 @@ public class KeyCommandMod {
             }
         }
         
-        // 路径序列类
-        private static class PathSequence {
-            private final String name;
-            private final List<double[]> gotoPoints;
-            private final List<BlockPos> clickPoints;
-            
-            public PathSequence(String name) {
-                this.name = name;
-                this.gotoPoints = new ArrayList<>();
-                this.clickPoints = new ArrayList<>();
-            }
-            
-            public void addPoint(double[] gotoPoint, BlockPos clickPoint) {
-                gotoPoints.add(gotoPoint);
-                clickPoints.add(clickPoint);
-            }
-            
-            public String getName() {
-                return name;
-            }
-            
-            public List<double[]> getGotoPoints() {
-                return gotoPoints;
-            }
-            
-            public List<BlockPos> getClickPoints() {
-                return clickPoints;
-            }
-        }
-        
         // 运行路径序列
         private void runPathSequence(String sequenceName) {
             if (!pathSequenceManager.hasSequence(sequenceName)) {
-                LOGGER.error("未知路径序列: " + sequenceName);
+                LOGGER.error("Unknown path sequence: " + sequenceName);
                 return;
             }
             
             PathSequence sequence = pathSequenceManager.getSequence(sequenceName);
-            if (sequence == null || sequence.getGotoPoints().isEmpty()) {
-                LOGGER.error("路径序列无效: " + sequenceName);
+            if (sequence == null || sequence.getSteps().isEmpty()) {
+                LOGGER.error("Invalid path sequence: " + sequenceName);
                 return;
             }
             
             // 获取路径序列的第一个点
-            double[] firstTarget = sequence.getGotoPoints().get(0);
+            double[] firstTarget = sequence.getSteps().get(0).getGotoPoint();
             
             // 发送第一个.goto命令
-            sendChatMessage(String.format(".goto %.0f %.0f %.0f", firstTarget[0], firstTarget[1], firstTarget[2]));
+            sendChatCommand(String.format(".goto %.0f %.0f %.0f", firstTarget[0], firstTarget[1], firstTarget[2]));
             
             // 注册事件监听器
             EventListener.instance.startTracking(sequence);
@@ -617,22 +741,25 @@ public class KeyCommandMod {
 
         }
 
-        // 静态的事件监听器类（确保即使GUI关闭后仍然可用）
+        // 静态的事件监听器类（完全重写以支持多操作）
         public static class EventListener {
             public static final EventListener instance = new EventListener();
             private PathSequence currentSequence;
-            private int currentTargetIndex = 0;
+            private int currentStepIndex = 0;
+            private int actionIndex = 0;
             private boolean tracking = false;
-            private BlockPos lastClickPos = null;
-            private boolean isWaitingForMove = false;
+            private int tickDelay = 0;
+            private boolean atTarget = false;
 
             private EventListener() {}
 
             public void startTracking(PathSequence sequence) {
                 this.currentSequence = sequence;
-                this.currentTargetIndex = 0;
+                this.currentStepIndex = 0;
+                this.actionIndex = 0;
                 this.tracking = true;
-                this.isWaitingForMove = false;
+                this.atTarget = false;
+                this.tickDelay = 0;
                 MinecraftForge.EVENT_BUS.register(this);
                 LOGGER.info("Tracking started for path: " + sequence.getName());
             }
@@ -648,78 +775,91 @@ public class KeyCommandMod {
 
             @SubscribeEvent
             public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-                if (!tracking || currentSequence == null || event.side != Side.CLIENT) return;
+                if (!tracking || event.phase != TickEvent.Phase.START || event.side != Side.CLIENT) return;
                 if (event.player == null || !event.player.equals(Minecraft.getMinecraft().player)) return;
                 
-                EntityPlayerSP player = Minecraft.getMinecraft().player;
-                List<double[]> gotoPoints = currentSequence.getGotoPoints();
-                List<BlockPos> clickPoints = currentSequence.getClickPoints();
+                EntityPlayerSP player = (EntityPlayerSP) event.player;
                 
-                if (currentTargetIndex >= gotoPoints.size()) {
-                    // 序列完成
-                    sendChatMessage(".goto cancel");
+                // 如果有延迟，等待延迟结束
+                if (tickDelay > 0) {
+                    tickDelay--;
+                    return;
+                }
+                
+                List<PathStep> steps = currentSequence.getSteps();
+                
+                // 检查是否完成序列
+                if (currentStepIndex >= steps.size()) {
+                    sendChatCommand(".goto cancel");
                     stopTracking();
                     return;
                 }
                 
-                double[] target = gotoPoints.get(currentTargetIndex);
-                BlockPos clickPos = clickPoints.get(currentTargetIndex);
+                PathStep currentStep = steps.get(currentStepIndex);
+                double[] target = currentStep.getGotoPoint();
                 
-                if (isWaitingForMove) {
+                if (!atTarget) {
                     // 检查玩家是否到达目标点
                     double playerX = player.posX;
                     double playerY = player.posY;
                     double playerZ = player.posZ;
                     
-                    double distance = Math.sqrt(
+                    double distanceSq = 
                         Math.pow(playerX - target[0], 2) +
                         Math.pow(playerY - target[1], 2) +
-                        Math.pow(playerZ - target[2], 2)
-                    );
+                        Math.pow(playerZ - target[2], 2);
                     
-                    if (distance < 1.5) {
-                        LOGGER.info("Reached point {} for {}", currentTargetIndex, currentSequence.getName());
-                        // 到达后右键点击方块
-                        rightClickOnBlock(clickPos);
+                    if (distanceSq < 4.0) { // 2格距离平方
+                        LOGGER.info("Reached target {} for {}", currentStepIndex, currentSequence.getName());
+                        atTarget = true;
+                        actionIndex = 0;
+                    }
+                } else {
+                    // 已到达目标点，执行动作
+                    List<Consumer<EntityPlayerSP>> actions = currentStep.getActions();
+                    
+                    // 检查是否完成当前步骤的所有动作
+                    if (actionIndex >= actions.size()) {
+                        // 移动到下一步
+                        currentStepIndex++;
+                        actionIndex = 0;
+                        atTarget = false;
                         
-                        // 移动到下一个点
-                        currentTargetIndex++;
-                        if (currentTargetIndex < gotoPoints.size()) {
-                            double[] nextTarget = gotoPoints.get(currentTargetIndex);
-                            sendChatMessage(".goto cancel");
-                            sendChatMessage(String.format(".goto %.0f %.0f %.0f", 
+                        // 如果还有下一步，发送新的.goto命令
+                        if (currentStepIndex < steps.size()) {
+                            double[] nextTarget = steps.get(currentStepIndex).getGotoPoint();
+                            sendChatCommand(".goto cancel");
+                            sendChatCommand(String.format(".goto %.0f %.0f %.0f", 
                                 nextTarget[0], nextTarget[1], nextTarget[2]));
-                            isWaitingForMove = true;
                         } else {
                             // 序列完成
-                            sendChatMessage(".goto cancel");
+                            sendChatCommand(".goto cancel");
                             stopTracking();
                         }
+                        return;
                     }
-                } else if (lastClickPos != clickPos) {
-                    // 第一次执行右键点击
-                    rightClickOnBlock(clickPos);
-                    lastClickPos = clickPos;
-                    isWaitingForMove = true;
-                    LOGGER.info("First click at {} for {}", clickPos, currentSequence.getName());
+                    
+                    // 执行当前动作
+                    try {
+                        Consumer<EntityPlayerSP> action = actions.get(actionIndex);
+                        action.accept(player);
+                        LOGGER.info("Executed action {} for step {}", actionIndex, currentStepIndex);
+                    } catch (Exception e) {
+                        LOGGER.error("Failed to execute action", e);
+                    }
+                    
+                    // 移动到下一个动作（如果有），添加少量延迟确保服务器处理
+                    actionIndex++;
+                    tickDelay = 5; // 等待5 ticks (0.25秒) 让服务器处理动作
                 }
             }
-
-            private void rightClickOnBlock(BlockPos pos) {
-                EntityPlayerSP player = Minecraft.getMinecraft().player;
-                EnumFacing facing = EnumFacing.UP;
-                Vec3d hitVec = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-
-                Minecraft.getMinecraft().playerController.processRightClickBlock(
-                    player, Minecraft.getMinecraft().world, pos, facing, hitVec, EnumHand.MAIN_HAND
-                );
-                player.swingArm(EnumHand.MAIN_HAND);
-            }
             
-            private void sendChatMessage(String message) {
+            // 发送临时聊天命令（不依赖GUI的sendChatMessage）
+            private void sendChatCommand(String command) {
                 EntityPlayerSP player = Minecraft.getMinecraft().player;
                 if (player != null && !player.isSpectator()) {
-                    player.sendChatMessage(message);
+                    player.sendChatMessage(command);
+                    LOGGER.info("Sent command: " + command);
                 }
             }
         }

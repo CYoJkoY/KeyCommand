@@ -1,9 +1,9 @@
 Manifest-Version: 1.0
 Implementation-Title: KeyCommand
-Implementation-Version: 0.5.0
+Implementation-Version: 0.5.1
 Specification-Vendor:  
 Specification-Title: KeyCommand
-Implementation-Timestamp: 2025-06-13T12:20:42+0800
+Implementation-Timestamp: 2025-06-14T01:59:24+0800
 Specification-Version: 1
 Implementation-Vendor:  
 

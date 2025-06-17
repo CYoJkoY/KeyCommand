@@ -2,13 +2,16 @@ package com.keycommand.keycommandmod;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.common.MinecraftForge;
@@ -114,11 +117,15 @@ public class KeyCommandMod {
         
         private int currentPage = sLastPage;
         private String currentCategory = sLastCategory;
-        private final List<String> categories = Arrays.asList("每日", "商店", "传送");
+        private final List<String> categories = Arrays.asList("每日", "商店", "传送", "自动操作");
         private final Map<String, List<String>> categoryItems = new HashMap<>();
         private final Map<String, List<String>> categoryItemNames = new HashMap<>();
         // 路径序列管理器
         private final PathSequenceManager pathSequenceManager = new PathSequenceManager();
+
+        private static int loopCount = 1; // 默认循环1次
+        private static int loopCounter = 0; // 当前运行次数计数
+        private static boolean isLooping = false; // 是否正在循环中
 
         public GuiInventory() {
             // 恢复当前分类和页码
@@ -305,6 +312,20 @@ public class KeyCommandMod {
 
             categoryItems.put("传送", TeleportItems);
             categoryItemNames.put("传送", TeleportItemNames);
+
+            // 自动操作分类
+            List<String> AutoItems = new ArrayList<>();
+            List<String> AutoItemNames = new ArrayList<>();
+            
+            AutoItems.add("path:破晓"); AutoItemNames.add("跑破晓");
+            AutoItems.add("path:暴怒"); AutoItemNames.add("跑暴怒");
+
+            // 新增循环设置按钮(+)
+            AutoItems.add("setloop"); AutoItemNames.add("循环次数");
+            AutoItems.add("stop"); AutoItemNames.add("停止运行");
+
+            categoryItems.put("自动操作", AutoItems);
+            categoryItemNames.put("自动操作", AutoItemNames);
         }
 
         // 初始化路径序列管理器 - 支持多步操作
@@ -622,15 +643,28 @@ public class KeyCommandMod {
         // 运行路径序列
         private void runPathSequence(String sequenceName) {
             if (!pathSequenceManager.hasSequence(sequenceName)) {
-                LOGGER.error("Unknown path sequence: " + sequenceName);
+                LOGGER.error("未知路径序列: " + sequenceName);
                 return;
             }
             
             PathSequence sequence = pathSequenceManager.getSequence(sequenceName);
             if (sequence == null || sequence.getSteps().isEmpty()) {
-                LOGGER.error("Invalid path sequence: " + sequenceName);
+                LOGGER.error("无效路径序列: " + sequenceName);
                 return;
             }
+            
+            loopCounter = 0;
+            isLooping = true;
+            
+            // 如果循环次数不为0，则开始执行
+            if (loopCount != 0) {
+                startNextLoop(sequenceName);
+            }
+        }
+        
+        // 开始下一次循环
+        private void startNextLoop(String sequenceName) {
+            PathSequence sequence = pathSequenceManager.getSequence(sequenceName);
             
             // 获取路径序列的第一个点
             double[] firstTarget = sequence.getSteps().get(0).getGotoPoint();
@@ -638,97 +672,136 @@ public class KeyCommandMod {
             // 发送第一个.goto命令
             sendChatCommand(String.format(".goto %.0f %.0f %.0f", firstTarget[0], firstTarget[1], firstTarget[2]));
             
+            // 更新计数器
+            loopCounter++;
+            
+            // 设置状态信息
+            String loopInfo = "循环 " + loopCounter;
+            if (loopCount > 0) {
+                loopInfo += "/" + loopCount;
+            }
+            EventListener.instance.setStatus(sequenceName + " - " + loopInfo);
+            
             // 注册事件监听器
-            EventListener.instance.startTracking(sequence);
+            EventListener.instance.startTracking(sequence, loopCount - loopCounter);
             
             // 注册全局事件监听器
             MinecraftForge.EVENT_BUS.register(EventListener.instance);
-            LOGGER.info("Started path sequence: " + sequenceName);
+            LOGGER.info("开始运行序列: " + sequenceName);
         }
 
-        @Override
-        public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 0.85F); // 半透明白色背景
-            
-            // 整体尺寸250x200像素
-            int totalWidth = 250;
-            int height = 200;
-            int x = (this.width - totalWidth) / 2; // 居中
-            int y = (this.height - height) / 2; // 居中
+@Override
+public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+    GlStateManager.color(1.0F, 1.0F, 1.0F, 0.85F); // 半透明白色背景
+    
+    // 整体尺寸250x200像素
+    int totalWidth = 250;
+    int height = 200;
+    int x = (this.width - totalWidth) / 2; // 居中
+    int y = (this.height - height) / 2; // 居中
 
-            // 绘制半透明白色背景
-            drawRect(x, y, x + totalWidth, y + height, 0x7FFFFFFF); // 半透明白色
-            
-            // 绘制标题（居中显示）
-            String title = "快捷菜单 - " + currentCategory;
-            drawCenteredString(fontRenderer, title, x + 125, y + 5, 0x555555); // 灰色标题文字
+    // 绘制半透明白色背景
+    drawRect(x, y, x + totalWidth, y + height, 0x7FFFFFFF); // 半透明白色
+    
+    // 绘制标题（居中显示）
+    String title = "快捷菜单 - " + currentCategory;
+    drawCenteredString(fontRenderer, title, x + 125, y + 5, 0x555555); // 灰色标题文字
 
-            // 绘制左侧分类区背景 (50x200)
-            drawRect(x, y, x + 50, y + height, 0x80DDDDDD); // 浅灰色背景
-            
-            // 绘制分类按钮（左侧垂直排列） - 调整位置以适应方框
-            for (int i = 0; i < categories.size(); i++) {
-                String category = categories.get(i);
-                // 调整按钮位置：Y位置从15改为25增加顶部空间，间距从45改为40减小间距
-                int buttonY = y + 25 + i * 40; // 增加顶部间距，减少按钮间距
-                
-                // 圆形按钮
-                int radius = 18; // 稍微减小半径以适应方框
-                int buttonX = x + 25; // 圆心位置
-                
-                // 高亮当前分类
-                float alpha = category.equals(currentCategory) ? 0.8F : 0.5F;
-                int color = category.equals(currentCategory) ? 0xFF00DD00 : 0xFFAAAAAA;
-                
-                // 绘制圆形背景（带透明度）
-                drawCircle(buttonX, buttonY, radius, (color & 0xFFFFFF) | ((int)(alpha * 255) << 24));
-                
-                // 绘制文字（固定在圆形中央）
-                int textWidth = fontRenderer.getStringWidth(category);
-                fontRenderer.drawStringWithShadow(category, 
-                    buttonX - textWidth/2, 
-                    buttonY - 3, 
-                    0xFFFFFF); // 白色文字
-            }
+    // 绘制左侧分类区背景 (50x200)
+    drawRect(x, y, x + 50, y + height, 0x80DDDDDD); // 浅灰色背景
+    
+    // 绘制分类按钮（左侧垂直排列） - 调整位置以适应方框
+    for (int i = 0; i < categories.size(); i++) {
+        String category = categories.get(i);
+        // 调整按钮位置：Y位置从15改为25增加顶部空间，间距从45改为40减小间距
+        int buttonY = y + 25 + i * 40; // 增加顶部间距，减少按钮间距
+        
+        // 圆形按钮
+        int radius = 18; // 稍微减小半径以适应方框
+        int buttonX = x + 25; // 圆心位置
+        
+        // 高亮当前分类
+        float alpha = category.equals(currentCategory) ? 0.8F : 0.5F;
+        int color = category.equals(currentCategory) ? 0xFF00DD00 : 0xFFAAAAAA;
+        
+        // 绘制圆形背景（带透明度）
+        drawCircle(buttonX, buttonY, radius, (color & 0xFFFFFF) | ((int)(alpha * 255) << 24));
+        
+        // 绘制文字（固定在圆形中央）
+        int textWidth = fontRenderer.getStringWidth(category);
+        fontRenderer.drawStringWithShadow(category, 
+            buttonX - textWidth/2, 
+            buttonY - 3, 
+            0xFFFFFF); // 白色文字
+    }
 
-            // 绘制当前分类的物品（右侧区域）
-            List<String> items = categoryItems.get(currentCategory);
-            List<String> itemNames = categoryItemNames.get(currentCategory);
-            
-            // 物品区位置
-            int itemAreaX = x + 55; // 增加左边距
-            int itemAreaY = y + 20;
-            
-            // 每行显示5个，最多4行
-            for (int i = 0; i < 20; i++) { // 最多显示20个（5列×4行）
-                int index = currentPage * 20 + i;
-                if (index >= items.size()) break;
-                
-                int col = i % 5; // 列索引 (0-4)
-                int row = i / 5; // 行索引 (0-3)
-                int itemX = itemAreaX + col * 36; // 简化间距
-                int itemY = itemAreaY + row * 40; // 每行40像素高
-                
-                // 绘制物品名称和图标
-                fontRenderer.drawStringWithShadow(itemNames.get(index), itemX, itemY, 0x333333);
-                fontRenderer.drawStringWithShadow("\u272A", itemX + 8, itemY + 12, 0xFFDD00); // 金色星星图标
-            }
+    // 绘制当前分类的物品（右侧区域）
+    List<String> items = categoryItems.get(currentCategory);
+    List<String> itemNames = categoryItemNames.get(currentCategory);
+    
+    // 物品区位置
+    int itemAreaX = x + 55; // 增加左边距
+    int itemAreaY = y + 20;
+    
+    // 每行显示5个，最多4行
+    for (int i = 0; i < 20; i++) { // 最多显示20个（5列×4行）
+        int index = currentPage * 20 + i;
+        if (index >= items.size()) break;
+        
+        int col = i % 5; // 列索引 (0-4)
+        int row = i / 5; // 行索引 (0-3)
+        int itemX = itemAreaX + col * 36; // 简化间距
+        int itemY = itemAreaY + row * 40; // 每行40像素高
+        
+        // 绘制物品名称和图标
+        fontRenderer.drawStringWithShadow(itemNames.get(index), itemX, itemY, 0x333333);
+        fontRenderer.drawStringWithShadow("\u272A", itemX + 8, itemY + 12, 0xFFDD00); // 金色星星图标
+    }
 
-            // 绘制页码信息（上移到物品区中部）
-            int totalPages = (items.size() + 19) / 20;
-            drawCenteredString(fontRenderer, "第" + (currentPage + 1) + "页/共" + totalPages + "页", 
-                              x + 175, y + 165, 0x666666); // 灰色页码文字
+    // 绘制页码信息（上移到物品区中部）
+    int totalPages = (items.size() + 19) / 20;
+    drawCenteredString(fontRenderer, "第" + (currentPage + 1) + "页/共" + totalPages + "页", 
+                      x + 175, y + 165, 0x666666); // 灰色页码文字
 
-            // 绘制上一页按钮（下移）
-            drawRect(x + 130, y + 180, x + 150, y + 195, 0xFFDDDDDD);
-            drawCenteredString(fontRenderer, "上一页", x + 140, y + 185, 0x333333);
+    // 绘制上一页按钮（下移）
+    drawRect(x + 130, y + 180, x + 150, y + 195, 0xFFDDDDDD);
+    drawCenteredString(fontRenderer, "上一页", x + 140, y + 185, 0x333333);
 
-            // 绘制下一页按钮（下移）
-            drawRect(x + 160, y + 180, x + 180, y + 195, 0xFFDDDDDD);
-            drawCenteredString(fontRenderer, "下一页", x + 170, y + 185, 0x333333);
+    // 绘制下一页按钮（下移）
+    drawRect(x + 160, y + 180, x + 180, y + 195, 0xFFDDDDDD);
+    drawCenteredString(fontRenderer, "下一页", x + 170, y + 185, 0x333333);
 
-            super.drawScreen(mouseX, mouseY, partialTicks);
+    // 如果是自动操作分类，显示状态信息
+    if (currentCategory.equals("自动操作")) {
+        // 显示当前循环设置
+        String loopSetting = "循环设置: ";
+        if (loopCount == -1) {
+            loopSetting += "无限循环";
+        } else if (loopCount == 0) {
+            loopSetting += "单次执行";
+        } else {
+            loopSetting += loopCount + "次";
         }
+        fontRenderer.drawStringWithShadow(loopSetting, x + 55, y + 180, 0x55FFFF);
+        
+        String statusText = "状态: ";
+        int color = 0xFFFF55; // 黄色
+        
+        if (EventListener.instance.isTracking()) {
+            statusText += EventListener.instance.getStatus();
+        } else if (!isLooping) {
+            statusText += "就绪";
+        } else if (loopCounter > 0 && loopCount > 0 && loopCounter >= loopCount) {
+            statusText += "已完成 (" + loopCounter + " 次)";
+        } else if (!EventListener.instance.isTracking()) {
+            statusText += "空闲";
+        }
+        
+        fontRenderer.drawStringWithShadow(statusText, x + 55, y + 190, color);
+    }
+    
+    super.drawScreen(mouseX, mouseY, partialTicks);
+}
         
         // 辅助方法：绘制圆形
         private void drawCircle(int x, int y, int radius, int color) {
@@ -801,19 +874,30 @@ public class KeyCommandMod {
                 
                 // 检测物品点击范围（基于文字的位置）
                 if (mouseX >= itemX && mouseX <= itemX + 30 && 
-                    mouseY >= itemY && mouseY <= itemY + 20) {
-                    String command = items.get(index);
-                    
-                    // 检查是否为路径序列命令
-                    if (command.startsWith("path:")) {
-                        runPathSequence(command.substring(5));
-                    } else {
-                        sendChatMessage(command);
-                        mc.displayGuiScreen(null);
+                        mouseY >= itemY && mouseY <= itemY + 20) {
+                        String command = items.get(index);
+                        
+                        if (command.startsWith("path:")) {
+                            runPathSequence(command.substring(5));
+                            return;
+                        } else if (currentCategory.equals("自动操作")) {
+                            if (command.equals("stop")) {
+                                // 停止运行
+                                EventListener.instance.stopTracking();
+                                isLooping = false;
+                                return;
+                            } else if (command.equals("setloop")) {
+                                // 打开循环次数设置GUI
+                                mc.displayGuiScreen(new LoopCountInputGui(this));
+                                return;
+                            }
+                        } else {
+                            sendChatMessage(command);
+                            mc.displayGuiScreen(null);
+                            return;
+                        }
                     }
-                    return;
                 }
-            }
 
             // 处理上一页按钮
             if (mouseX >= x + 130 && mouseY >= y + 180 && 
@@ -854,7 +938,7 @@ public class KeyCommandMod {
 
         }
 
-        // 静态的事件监听器类（完全重写以支持多操作）
+        // 静态的事件监听器类（完全重写以支持多操作和循环）
         public static class EventListener {
             public static final EventListener instance = new EventListener();
             private PathSequence currentSequence;
@@ -863,18 +947,32 @@ public class KeyCommandMod {
             private boolean tracking = false;
             private int tickDelay = 0;
             private boolean atTarget = false;
-
+            private int remainingLoops = 0;
+            private String status = "";
             private EventListener() {}
 
-            public void startTracking(PathSequence sequence) {
+            public boolean isTracking() {
+                return tracking;
+            }
+
+            public void setStatus(String s) {
+                status = s;
+            }
+            
+            public String getStatus() {
+                return status;
+            }
+
+            public void startTracking(PathSequence sequence, int remainingLoops) {
                 this.currentSequence = sequence;
                 this.currentStepIndex = 0;
                 this.actionIndex = 0;
                 this.tracking = true;
                 this.atTarget = false;
                 this.tickDelay = 0;
+                this.remainingLoops = remainingLoops;
                 MinecraftForge.EVENT_BUS.register(this);
-                LOGGER.info("Tracking started for path: " + sequence.getName());
+                LOGGER.info("开始跟踪路径: " + sequence.getName());
             }
 
             public void stopTracking() {
@@ -882,7 +980,8 @@ public class KeyCommandMod {
                     this.tracking = false;
                     this.currentSequence = null;
                     MinecraftForge.EVENT_BUS.unregister(this);
-                    LOGGER.info("Path tracking stopped");
+                    status = "已停止";
+                    LOGGER.info("路径跟踪已停止");
                 }
             }
 
@@ -904,7 +1003,33 @@ public class KeyCommandMod {
                 // 检查是否完成序列
                 if (currentStepIndex >= steps.size()) {
                     sendChatCommand(".goto cancel");
-                    stopTracking();
+                    
+                    // 处理循环逻辑
+                    if (remainingLoops != 0) {
+                        // 无限循环或还有剩余次数
+                        if (remainingLoops > 0) {
+                            remainingLoops--;
+                        }
+                        
+                        // 如果还有剩余次数或无限循环
+                        if (remainingLoops != 0 || GuiInventory.loopCount < 0) {
+                            status = "等待循环...";
+                            
+                            // 注册全局事件监听器
+                            MinecraftForge.EVENT_BUS.unregister(this);
+                            tracking = false;
+                            currentSequence = null;
+                            
+                            return;
+                        } else {
+                            // 完成所有循环
+                            GuiInventory.isLooping = false;
+                            status = "已完成 (" + GuiInventory.loopCounter + " 次)";
+                            stopTracking();
+                        }
+                    } else {
+                        stopTracking();
+                    }
                     return;
                 }
                 
@@ -923,7 +1048,7 @@ public class KeyCommandMod {
                         Math.pow(playerZ - target[2], 2);
                     
                     if (distanceSq < 4.0) { // 2格距离平方
-                        LOGGER.info("Reached target {} for {}", currentStepIndex, currentSequence.getName());
+                        LOGGER.info("到达目标 {} for {}", currentStepIndex, currentSequence.getName());
                         atTarget = true;
                         actionIndex = 0;
                     }
@@ -945,9 +1070,8 @@ public class KeyCommandMod {
                             sendChatCommand(String.format(".goto %.0f %.0f %.0f", 
                                 nextTarget[0], nextTarget[1], nextTarget[2]));
                         } else {
-                            // 序列完成
+                            // 序列完成，发送取消指令
                             sendChatCommand(".goto cancel");
-                            stopTracking();
                         }
                         return;
                     }
@@ -959,7 +1083,7 @@ public class KeyCommandMod {
                     if (action instanceof GuiInventory.DelayAction) {
                     	GuiInventory.DelayAction delayAction = (GuiInventory.DelayAction) action;
                     	tickDelay = delayAction.getDelayTicks();
-                    	LOGGER.info("Delaying for {} ticks", tickDelay);
+                    	LOGGER.info("延迟 {} tick", tickDelay);
                     	// 移动至下一个动作
                     	actionIndex++;
                     	return; // 等待延迟期间，直接返回
@@ -968,9 +1092,9 @@ public class KeyCommandMod {
                     // 执行动作
                     try {
                         action.accept(player);
-                        LOGGER.info("Executed action {} for step {}", actionIndex, currentStepIndex);
+                        LOGGER.info("执行动作 {} for step {}", actionIndex, currentStepIndex);
                     } catch (Exception e) {
-                        LOGGER.error("Failed to execute action", e);
+                        LOGGER.error("执行动作失败", e);
                     }
                     
                     // 移动到下一个动作（如果有），添加少量延迟确保服务器处理
@@ -984,7 +1108,99 @@ public class KeyCommandMod {
                 EntityPlayerSP player = Minecraft.getMinecraft().player;
                 if (player != null && !player.isSpectator()) {
                     player.sendChatMessage(command);
-                    LOGGER.info("Sent command: " + command);
+                    LOGGER.info("发送命令: " + command);
+                }
+            }
+        }
+
+        public static class LoopCountInputGui extends GuiScreen {
+            private final GuiInventory parent;
+            private String inputText = "";
+            private GuiTextField numberField;
+            
+            public LoopCountInputGui(GuiInventory parent) {
+                this.parent = parent;
+            }
+            
+            @Override
+            public void initGui() {
+                super.initGui();
+                this.buttonList.clear();
+                
+                // 创建输入框
+                numberField = new GuiTextField(0, fontRenderer, 
+                    this.width/2 - 100, this.height/2 - 25, 
+                    200, 20);
+                numberField.setFocused(true);
+                numberField.setCanLoseFocus(false);
+                numberField.setMaxStringLength(10);
+                numberField.setText(inputText);
+                
+                // 确认按钮
+                this.buttonList.add(new GuiButton(0, this.width/2 - 100, this.height/2, 90, 20, "确认"));
+                // 取消按钮
+                this.buttonList.add(new GuiButton(1, this.width/2 + 10, this.height/2, 90, 20, "取消"));
+                // 无限循环按钮
+                this.buttonList.add(new GuiButton(2, this.width/2 - 100, this.height/2 + 30, 200, 20, "设置为无限循环"));
+            }
+            
+            @Override
+            protected void keyTyped(char typedChar, int keyCode) throws IOException {
+                super.keyTyped(typedChar, keyCode);
+                
+                if (numberField.textboxKeyTyped(typedChar, keyCode)) {
+                    inputText = numberField.getText();
+                    return;
+                }
+            }
+            
+            @Override
+            protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+                super.mouseClicked(mouseX, mouseY, mouseButton);
+                numberField.mouseClicked(mouseX, mouseY, mouseButton);
+            }
+            
+            @Override
+            public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+                this.drawDefaultBackground();
+                
+                // 标题
+                drawCenteredString(fontRenderer, "设置循环次数", width/2, height/2 - 50, 0xFFFFFF);
+                
+                // 提示文字
+                drawString(fontRenderer, "输入数字（0=不循环，-1=无限循环）:", 
+                    width/2 - 100, height/2 - 40, 0xA0A0A0);
+                
+                // 绘制输入框
+                numberField.drawTextBox();
+                
+                super.drawScreen(mouseX, mouseY, partialTicks);
+            }
+            
+            @Override
+            protected void actionPerformed(GuiButton button) throws IOException {
+                if (button.id == 0) { // 确认按钮
+                    setLoopCount();
+                    mc.displayGuiScreen(parent);
+                } 
+                else if (button.id == 1) { // 取消按钮
+                    mc.displayGuiScreen(parent);
+                }
+                else if (button.id == 2) { // 无限循环按钮
+                    GuiInventory.loopCount = -1; // 修正点：使用 parent.loopCount
+                    mc.displayGuiScreen(parent);
+                }
+            }
+            
+            private void setLoopCount() {
+                try {
+                    GuiInventory.loopCount = Integer.parseInt(inputText.trim()); // 修正点：使用 parent.loopCount
+                    GuiInventory.loopCounter = 0; // 修正点：使用 parent.loopCounter
+                } catch (NumberFormatException e) {
+                    // 无效输入处理
+                    GuiInventory.loopCount = 1; // 修正点：使用 parent.loopCount
+                    Minecraft.getMinecraft().player.sendMessage(
+                        new TextComponentString("§c无效输入! 已重置为单次循环"));
                 }
             }
         }

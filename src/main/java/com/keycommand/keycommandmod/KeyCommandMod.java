@@ -1,17 +1,29 @@
+// KeyCommandMod.java
+
 package com.keycommand.keycommandmod;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiMerchant;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.Entity;
+import net.minecraft.inventory.ClickType;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.village.MerchantRecipe;
+import net.minecraft.village.MerchantRecipeList;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.common.MinecraftForge;
@@ -22,10 +34,15 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
+
 import org.lwjgl.input.Keyboard;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +57,8 @@ public class KeyCommandMod {
     public static final String NAME = "Key Command Mod";
     public static final String VERSION = "1.0";
 
-    private static final Logger LOGGER = LogManager.getLogger(KeyCommandMod.class);
+    public static final Logger LOGGER = LogManager.getLogger(KeyCommandMod.class);
+    public static KeyCommandMod instance;
 
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -51,9 +69,16 @@ public class KeyCommandMod {
     private static final KeyBinding hbKey = new KeyBinding("货币兑换", KeyConflictContext.UNIVERSAL, KeyModifier.ALT, Keyboard.KEY_P, "key.categories.keycommand");
     private static final KeyBinding nzwKey = new KeyBinding("农作物兑换", KeyConflictContext.UNIVERSAL, KeyModifier.ALT, Keyboard.KEY_L, "key.categories.keycommand");
     private static final KeyBinding guiKey = new KeyBinding("快捷菜单", KeyConflictContext.UNIVERSAL, KeyModifier.ALT, Keyboard.KEY_T, "key.categories.keycommand");
-
+    
+    public static final GuiInventory.PathSequenceManager pathSequenceManager = new GuiInventory.PathSequenceManager();
+    static {
+        GuiInventory.initializePathSequences();
+    }
+    
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        instance = this;
+
         ClientRegistry.registerKeyBinding(teleKey);
         ClientRegistry.registerKeyBinding(srpOpenKey);
         ClientRegistry.registerKeyBinding(menuKey);
@@ -65,8 +90,58 @@ public class KeyCommandMod {
         // Register the event listener
         MinecraftForge.EVENT_BUS.register(this);
         LOGGER.info("Key Command Mod initialized!");
+        
+        MinecraftForge.EVENT_BUS.register(new AutoLoopHandler());
+        
+        GuiInventory.initializePathSequences();
     }
 
+    public static void tryAutoStartLoop() {
+        try {
+            Path path = Paths.get("config/keycommandmod_autorun.json");
+            LOGGER.info("尝试读取配置文件: " + path.toAbsolutePath());
+            if (!Files.exists(path)) {
+                LOGGER.info("配置文件不存在，跳过自动执行");
+                return;
+            }
+
+            String s = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+            // 简单解析
+            boolean autoLoop = s.contains("\"autoLoop\":true");
+            String seq = "";
+            int loopCount = 1;
+            int idx = s.indexOf("\"loopSequence\":\"");
+            if (idx != -1) {
+                int start = idx + "\"loopSequence\":\"".length();
+                int end = s.indexOf("\"", start);
+                if (end > start) seq = s.substring(start, end);
+            }
+            idx = s.indexOf("\"loopCount\":");
+            if (idx != -1) {
+                int start = idx + "\"loopCount\":".length();
+                int end = s.indexOf("}", start);
+                if (end == -1) end = s.length();
+                try {
+                    loopCount = Integer.parseInt(s.substring(start, end).replaceAll("[^\\d\\-]", ""));
+                } catch (Exception ignore) {}
+            }
+            if (autoLoop && !seq.isEmpty() && loopCount == -1) {
+                LOGGER.info("检测到需要自动无限循环执行：" + seq);
+                final String fSeq = seq;
+                final int fLoopCount = loopCount;
+                // 直接用 Minecraft.getMinecraft().addScheduledTask 兼容性更好
+                Minecraft.getMinecraft().addScheduledTask(() -> {
+                    GuiInventory.loopCount = fLoopCount;
+                    GuiInventory.loopCounter = 0;
+                    GuiInventory.isLooping = true;
+                    GuiInventory.runPathSequence(fSeq);
+                });
+            }
+        } catch (Exception e) {
+            LOGGER.error("读取自动循环配置失败", e);
+        }
+    }
+    
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
         if (Keyboard.getEventKeyState()) { // Check if the key is pressed down
@@ -110,6 +185,7 @@ public class KeyCommandMod {
     }
 
     public static class GuiInventory extends GuiScreen {
+        private static final Minecraft mc = Minecraft.getMinecraft();
         // 添加静态变量保存上次的状态
         private static String sLastCategory = "每日";
         private static int sLastPage = 0;
@@ -121,7 +197,7 @@ public class KeyCommandMod {
         private final Map<String, List<String>> categoryItems = new HashMap<>();
         private final Map<String, List<String>> categoryItemNames = new HashMap<>();
         // 路径序列管理器
-        private final PathSequenceManager pathSequenceManager = new PathSequenceManager();
+        public static final PathSequenceManager pathSequenceManager = new PathSequenceManager();
 
         private static int loopCount = 1; // 默认循环1次
         private static int loopCounter = 0; // 当前运行次数计数
@@ -152,9 +228,6 @@ public class KeyCommandMod {
             DailyItems.add("/res tp pk");DailyItemNames.add("传跑酷");
             DailyItems.add("/res tp wrx");DailyItemNames.add("传温柔");
             DailyItems.add("/res tp pxxd");DailyItemNames.add("传破晓");
-            DailyItems.add("path:破晓"); DailyItemNames.add("跑破晓");
-            DailyItems.add("/res tp baonu");DailyItemNames.add("传暴怒");
-            DailyItems.add("path:暴怒"); DailyItemNames.add("跑暴怒");
             
             categoryItems.put("每日", DailyItems);
             categoryItemNames.put("每日", DailyItemNames);
@@ -168,11 +241,12 @@ public class KeyCommandMod {
             ShopItems.add("/res tp xyq");ShopItemNames.add("传木牌");
             ShopItems.add("/res tp gezi");ShopItemNames.add("传圆石");
             ShopItems.add("/res tp dp");ShopItemNames.add("传工具");
+            
             ShopItems.add("/cshop open 防疫套兑换");ShopItemNames.add("1-1");
             ShopItems.add("/cshop open 寄生者兑换");ShopItemNames.add("1-2");
             ShopItems.add("/cshop open 异变");ShopItemNames.add("1-3");
-            ShopItems.add("/cshop open 信仰");ShopItemNames.add("1-4");
-            ShopItems.add("/cshop open 1-5");ShopItemNames.add("1-5");
+            ShopItems.add("/cshop open 1-5");ShopItemNames.add("1-4");
+            ShopItems.add("/cshop open 信仰");ShopItemNames.add("1-5");
             ShopItems.add("/cshop open 熔岩");ShopItemNames.add("1-6");
             ShopItems.add("/cshop open 2-1");ShopItemNames.add("2-1");
             ShopItems.add("/cshop open 2-2");ShopItemNames.add("2-2");
@@ -271,6 +345,8 @@ public class KeyCommandMod {
             TeleportItems.add("/res tp tianben");TeleportItemNames.add("传天本");
             TeleportItems.add("/res tp dmdl");TeleportItemNames.add("传斗喵");
             TeleportItems.add("/res tp hs");TeleportItemNames.add("传海神");
+            TeleportItems.add("/res tp ah");TeleportItemNames.add("传暗黑");
+            TeleportItems.add("/res tp pxxd");TeleportItemNames.add("传破晓");
             TeleportItems.add("/res tp ygsl");TeleportItemNames.add("传月光");
             TeleportItems.add("/res tp pbzd");TeleportItemNames.add("传破败");
             
@@ -317,25 +393,32 @@ public class KeyCommandMod {
             List<String> AutoItems = new ArrayList<>();
             List<String> AutoItemNames = new ArrayList<>();
             
-            AutoItems.add("path:破晓"); AutoItemNames.add("跑破晓");
-            AutoItems.add("path:暴怒"); AutoItemNames.add("跑暴怒");
-
             // 新增循环设置按钮(+)
             AutoItems.add("setloop"); AutoItemNames.add("循环次数");
             AutoItems.add("stop"); AutoItemNames.add("停止运行");
+            
+            AutoItems.add("path:每日"); AutoItemNames.add("做每日");
+            AutoItems.add("path:破晓"); AutoItemNames.add("跑破晓");
+            AutoItems.add("path:暴怒"); AutoItemNames.add("跑暴怒");
+            AutoItems.add("path:6-3/A"); AutoItemNames.add("挂6-3/A");
+            AutoItems.add("path:6-3/1"); AutoItemNames.add("挂6-3/1");
+            AutoItems.add("path:6-3/2"); AutoItemNames.add("挂6-3/2");
+            AutoItems.add("path:6-4/A"); AutoItemNames.add("挂6-4/A");
+            AutoItems.add("path:6-4/1"); AutoItemNames.add("挂6-4/1");
+            AutoItems.add("path:6-4/2"); AutoItemNames.add("挂6-4/2");
+            AutoItems.add("path:6-5/A"); AutoItemNames.add("挂6-5/A");
+            AutoItems.add("path:6-5/1"); AutoItemNames.add("挂6-5/1");
+            AutoItems.add("path:6-5/2"); AutoItemNames.add("挂6-5/2");
+            AutoItems.add("path:6-5/3"); AutoItemNames.add("挂6-5/3");
+            AutoItems.add("path:6-5/4"); AutoItemNames.add("挂6-5/4");
 
             categoryItems.put("自动操作", AutoItems);
             categoryItemNames.put("自动操作", AutoItemNames);
         }
 
         // 初始化路径序列管理器 - 支持多步操作
-        private void initializePathSequences() {
-            
-            // 设置角度（与游戏中对应） xxx.addAction(player -> setPlayerViewAngles(player, 66.5f, -46.0f));
-            // 发送聊天内容（可用于发送指令） xxx.addAction(player -> sendChatCommand("/jump"));
-            // 指定坐标右键 xxx.addAction(player -> rightClickOnBlock(player, new BlockPos(190, 8, -488)));
-            // 手动添加延迟ticks（1tick = 50ms） xxx.addAction(new DelayAction(10)); 
-        	
+        public static void initializePathSequences() {
+
             // 破晓路径序列
             PathSequence morningSequence = new PathSequence("破晓");
 
@@ -381,16 +464,16 @@ public class KeyCommandMod {
             PathStep morning14 = new PathStep(new double[]{312, 8, -480});
             morning14.addAction(player -> rightClickOnBlock(player, new BlockPos(311, 10, -482)));
 
-            PathStep morning15 = new PathStep(new double[]{368, 6, -409});
+            PathStep morning15 = new PathStep(new double[]{366, 6, -410});
             morning15.addAction(player -> rightClickOnBlock(player, new BlockPos(370, 7, -407)));
 
-            PathStep morning16 = new PathStep(new double[]{354, 6, -394});
+            PathStep morning16 = new PathStep(new double[]{355, 6, -396});
             morning16.addAction(player -> rightClickOnBlock(player, new BlockPos(352, 7, -391)));
 
-            PathStep morning17 = new PathStep(new double[]{378, 13, -395});
+            PathStep morning17 = new PathStep(new double[]{377, 13, -395});
             morning17.addAction(player -> rightClickOnBlock(player, new BlockPos(380, 14, -394)));
 
-            PathStep morning18 = new PathStep(new double[]{345, 13, -398});
+            PathStep morning18 = new PathStep(new double[]{346, 13, -397});
             morning18.addAction(player -> rightClickOnBlock(player, new BlockPos(343, 14, -399)));
 
             PathStep morning19 = new PathStep(new double[]{394, 6, -372});
@@ -529,10 +612,319 @@ public class KeyCommandMod {
             angerSequence.addStep(anger14b);
 
             pathSequenceManager.addSequence(angerSequence);
+            
+            // 6-3点位1路径序列
+            PathSequence B631Sequence = new PathSequence("6-3/1");
+            
+            PathStep B631B1 = new PathStep(new double[]{180, 56, -396});
+            B631B1.addAction(new DelayAction(320)); 
+            
+            PathStep B631B2 = new PathStep(new double[]{200, 56, -414});
+            B631B2.addAction(new DelayAction(320)); 
+            
+            B631Sequence.addStep(B631B1);
+            B631Sequence.addStep(B631B2);
+            
+            pathSequenceManager.addSequence(B631Sequence);
+            
+            // 6-3点位2路径序列
+            PathSequence B632Sequence = new PathSequence("6-3/2");
+            
+            PathStep B632B1 = new PathStep(new double[]{202, 52, -490});
+            B632B1.addAction(new DelayAction(320)); 
+            
+            PathStep B632B2 = new PathStep(new double[]{203, 52, -502});
+            B632B2.addAction(new DelayAction(320)); 
+            
+            B632Sequence.addStep(B632B1);
+            B632Sequence.addStep(B632B2);
+            
+            pathSequenceManager.addSequence(B632Sequence);
+            
+            // 6-3点位A路径序列
+            PathSequence B63ASequence = new PathSequence("6-3/A");
+            
+            B63ASequence.addStep(B631B1);
+            B63ASequence.addStep(B631B2);
+            B63ASequence.addStep(B632B1);
+            B63ASequence.addStep(B632B2);
+            B63ASequence.addStep(B632B1);
+            B63ASequence.addStep(B631B2);
+            
+            pathSequenceManager.addSequence(B63ASequence);
+            
+            // 6-4点位1路径序列
+            PathSequence B641Sequence = new PathSequence("6-4/1");
+            
+            PathStep B641B1 = new PathStep(new double[]{-10, 10, -10});
+            B641B1.addAction(new DelayAction(320)); 
+            
+            PathStep B641B2 = new PathStep(new double[]{-9, 10, -25});
+            B641B2.addAction(new DelayAction(320)); 
+            
+            PathStep B641B3 = new PathStep(new double[]{6, 10, -25});
+            B641B3.addAction(new DelayAction(320)); 
+            
+            B641Sequence.addStep(B641B1);
+            B641Sequence.addStep(B641B2);
+            B641Sequence.addStep(B641B3);
+            B641Sequence.addStep(B641B2);
+            
+            pathSequenceManager.addSequence(B641Sequence);
+            
+            // 6-4点位2路径序列
+            PathSequence B642Sequence = new PathSequence("6-4/2");
+            
+            PathStep B642B1 = new PathStep(new double[]{30, 13, 40});
+            B642B1.addAction(new DelayAction(320)); 
+            
+            PathStep B642B2 = new PathStep(new double[]{7, 12, 57});
+            B642B2.addAction(new DelayAction(320)); 
+            
+            PathStep B642B3 = new PathStep(new double[]{-15, 11, 49});
+            B642B3.addAction(new DelayAction(320)); 
+            
+            B642Sequence.addStep(B642B1);
+            B642Sequence.addStep(B642B2);
+            B642Sequence.addStep(B642B3);
+            B642Sequence.addStep(B642B2);
+            
+            pathSequenceManager.addSequence(B642Sequence);
+            
+            // 6-4点位A路径序列
+            PathSequence B64ASequence = new PathSequence("6-4/A");
+            
+            PathStep B64B1 = new PathStep(new double[]{1, 11, 11});
+            B64B1.addAction(new DelayAction(320)); 
+            
+            B64ASequence.addStep(B641B1);
+            B64ASequence.addStep(B641B2);
+            B64ASequence.addStep(B641B3);
+            B64ASequence.addStep(B64B1);
+            B64ASequence.addStep(B642B1);
+            B64ASequence.addStep(B642B2);
+            B64ASequence.addStep(B642B3);
+            B64ASequence.addStep(B642B2);
+            B64ASequence.addStep(B642B1);
+            B64ASequence.addStep(B64B1);
+            B64ASequence.addStep(B641B3);
+            B64ASequence.addStep(B641B2);
+            
+            pathSequenceManager.addSequence(B64ASequence);
+            
+            // 6-5点位1路径序列
+            PathSequence B651Sequence = new PathSequence("6-5/1");
+            
+            PathStep B651B1 = new PathStep(new double[]{-101, 8, 1348});
+            B651B1.addAction(new DelayAction(320)); 
+            
+            PathStep B651B2 = new PathStep(new double[]{-112, 11, 1339});
+            B651B2.addAction(new DelayAction(320)); 
+            
+            PathStep B651B3 = new PathStep(new double[]{-120, 12, 1325});
+            B651B3.addAction(new DelayAction(320)); 
+            
+            B651Sequence.addStep(B651B1);
+            B651Sequence.addStep(B651B2);
+            B651Sequence.addStep(B651B3);
+            B651Sequence.addStep(B651B2);
+            
+            pathSequenceManager.addSequence(B651Sequence);
+            
+            // 6-5点位2路径序列
+            PathSequence B652Sequence = new PathSequence("6-5/2");
+            
+            PathStep B652B1 = new PathStep(new double[]{-98, 15, 1249});
+            B652B1.addAction(new DelayAction(320)); 
+            
+            PathStep B652B2 = new PathStep(new double[]{-68, 18, 1257});
+            B652B2.addAction(new DelayAction(320)); 
+            
+            PathStep B652B3 = new PathStep(new double[]{-54, 19, 1266});
+            B652B3.addAction(new DelayAction(320)); 
+            
+            B652Sequence.addStep(B652B1);
+            B652Sequence.addStep(B652B2);
+            B652Sequence.addStep(B652B3);
+            B652Sequence.addStep(B652B2);
+            
+            pathSequenceManager.addSequence(B652Sequence);
+            
+            // 6-5点位3路径序列
+            PathSequence B653Sequence = new PathSequence("6-5/3");
+            
+            PathStep B653B1 = new PathStep(new double[]{-89, 18, 1175});
+            B653B1.addAction(new DelayAction(320)); 
+            
+            PathStep B653B2 = new PathStep(new double[]{-85, 20, 1142});
+            B653B2.addAction(new DelayAction(320)); 
+            
+            PathStep B653B3 = new PathStep(new double[]{-84, 30, 1109});
+            B653B3.addAction(new DelayAction(320)); 
+            
+            PathStep B653B4 = new PathStep(new double[]{-79, 35, 1074});
+            B653B4.addAction(new DelayAction(320)); 
+            
+            B653Sequence.addStep(B653B1);
+            B653Sequence.addStep(B653B2);
+            B653Sequence.addStep(B653B3);
+            B653Sequence.addStep(B653B4);
+            B653Sequence.addStep(B653B3);
+            B653Sequence.addStep(B653B2);
+            
+            pathSequenceManager.addSequence(B653Sequence);
+            
+            // 6-5点位4路径序列
+            PathSequence B654Sequence = new PathSequence("6-5/4");
+            
+            PathStep B654B1 = new PathStep(new double[]{-186, 46, 1315});
+            B654B1.addAction(new DelayAction(320)); 
+            
+            PathStep B654B2a = new PathStep(new double[]{-200, 42, 1300});
+            B654B2a.addAction(new DelayAction(320)); 
+            
+            PathStep B654B2b = new PathStep(new double[]{-200, 42, 1300});
+            B654B2b.addAction(new DelayAction(320)); 
+            B654B2b.addAction(player -> setPlayerViewAngles(player, -40.0f, -6.4f));
+            B654B2b.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep B654B3 = new PathStep(new double[]{-202, 42, 1267});
+            B654B3.addAction(new DelayAction(320)); 
+            
+            B654Sequence.addStep(B654B1);
+            B654Sequence.addStep(B654B2a);
+            B654Sequence.addStep(B654B3);
+            B654Sequence.addStep(B654B2b);
+            
+            pathSequenceManager.addSequence(B654Sequence);
+            
+            // 6-5点位A路径序列
+            PathSequence B65ASequence = new PathSequence("6-5/A");
+            
+            PathStep B65B1 = new PathStep(new double[]{-103, 16, 1291});
+            B65B1.addAction(new DelayAction(320)); 
+            
+            B65ASequence.addStep(B651B1);
+            B65ASequence.addStep(B651B2);
+            B65ASequence.addStep(B651B3);
+            B65ASequence.addStep(B65B1);
+            B65ASequence.addStep(B652B1);
+            B65ASequence.addStep(B652B2);
+            B65ASequence.addStep(B652B3);
+            B65ASequence.addStep(B652B2);
+            B65ASequence.addStep(B652B1);
+            B65ASequence.addStep(B65B1);
+            B65ASequence.addStep(B651B3);
+            B65ASequence.addStep(B651B2);
+            
+            pathSequenceManager.addSequence(B65ASequence);
+            
+            // 每日路径序列
+            PathSequence DailyTaskSequence = new PathSequence("每日");
+            
+            PathStep DailyTask1a = new PathStep(new double[]{Double.NaN, Double.NaN, Double.NaN});
+            DailyTask1a.addAction(player -> sendChatCommand("/res tp zhanbu"));
+            
+            PathStep DailyTask1b = new PathStep(new double[]{45, 105, 51});
+            DailyTask1b.addAction(player -> rightClickOnBlock(player, new BlockPos(46, 105, 48)));
+            DailyTask1b.addAction(player -> rightClickOnBlock(player, new BlockPos(46, 105, 54)));
+            DailyTask1b.addAction(player -> sendChatCommand("/res tp viplb"));
+            
+            PathStep DailyTask2 = new PathStep(new double[]{-152, 110, -732});
+            DailyTask2.addAction(player -> rightClickOnBlock(player, new BlockPos(-148, 110, -731)));
+            DailyTask2.addAction(player -> rightClickOnBlock(player, new BlockPos(-150, 110, -731)));
+            DailyTask2.addAction(player -> rightClickOnBlock(player, new BlockPos(-152, 110, -731)));
+            DailyTask2.addAction(player -> rightClickOnBlock(player, new BlockPos(-154, 110, -731)));
+            DailyTask2.addAction(player -> rightClickOnBlock(player, new BlockPos(-156, 110, -731)));
+            DailyTask2.addAction(player -> sendChatCommand("/res tp yyzh"));
+            
+            PathStep DailyTask3 = new PathStep(new double[]{-2524, 161, 97});
+            DailyTask3.addAction(player -> rightClickOnNearestEntity(player, new BlockPos(-2526, 162, 98), 0.5)); 
+            DailyTask3.addAction(player -> autoVillagerTradeFull(player, 0, 1)); 
+            DailyTask3.addAction(player -> rightClickOnBlock(player, new BlockPos(-2522, 162, 94)));
+            DailyTask3.addAction(player -> sendChatCommand("/res tp mnrs"));
+            
+            PathStep DailyTask4 = new PathStep(new double[]{Double.NaN, Double.NaN, Double.NaN});
+            DailyTask4.addAction(player -> setPlayerViewAngles(player, 91.6f, -3.0f));
+            DailyTask4.addAction(new DelayAction(12));
+            DailyTask4.addAction(player -> sendChatCommand("/jump"));
+            DailyTask4.addAction(player -> rightClickOnBlock(player, new BlockPos(-55, 25, -3)));
+            DailyTask4.addAction(new DelayAction(12));
+            DailyTask4.addAction(player -> sendChatCommand("/res tp pk"));
+            
+            PathStep DailyTask5a = new PathStep(new double[]{153, 4, -559});
+            DailyTask5a.addAction(player -> setPlayerViewAngles(player, -140.0f, -50.0f));
+            DailyTask5a.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep DailyTask5b = new PathStep(new double[]{175, 16, -551});
+            DailyTask5b.addAction(player -> setPlayerViewAngles(player, -130.0f, -5.0f));
+            DailyTask5b.addAction(player -> sendChatCommand("/jump"));
+            
+            PathStep DailyTask5c = new PathStep(new double[]{190, 18, -569});
+            DailyTask5c.addAction(player -> rightClickOnBlock(player, new BlockPos(190, 14, -569)));
+            DailyTask5c.addAction(player -> sendChatCommand("/res tp sj"));
+            
+            PathStep DailyTask6 = new PathStep(new double[]{-85, 104, 43});
+            DailyTask6.addAction(player -> rightClickOnBlock(player, new BlockPos(-86, 105, 46)));
+            DailyTask6.addAction(player -> rightClickOnBlock(player, new BlockPos(-86, 105, 43)));
+            DailyTask6.addAction(player -> rightClickOnBlock(player, new BlockPos(-86, 105, 40)));
+            DailyTask6.addAction(player -> sendChatCommand("/res tp wrx3"));
+            
+            PathStep DailyTask7a = new PathStep(new double[]{262, 83, 123});
+            DailyTask7a.addAction(player -> rightClickOnBlock(player, new BlockPos(259, 84, 123)));
+            DailyTask7a.addAction(player -> rightClickOnBlock(player, new BlockPos(261, 84, 120)));
+            
+            PathStep DailyTask7b = new PathStep(new double[]{268, 83, 134});
+            DailyTask7b.addAction(player -> rightClickOnBlock(player, new BlockPos(271, 84, 131)));
+            DailyTask7b.addAction(player -> rightClickOnBlock(player, new BlockPos(269, 84, 138)));
+            
+            PathStep DailyTask7c = new PathStep(new double[]{262, 83, 134});
+            DailyTask7c.addAction(player -> rightClickOnBlock(player, new BlockPos(262, 84, 138)));
+            
+            PathStep DailyTask8 = new PathStep(new double[]{Double.NaN, Double.NaN, Double.NaN});
+            DailyTask8.addAction(player -> sendChatCommand("/menu"));
+            DailyTask8.addAction(new DelayAction(20));
+            DailyTask8.addAction(player -> autoChestClick(player, 9)); 
+            DailyTask8.addAction(new DelayAction(12));
+            DailyTask8.addAction(player -> autoChestClick(player, 13)); 
+            DailyTask8.addAction(new DelayAction(12));
+            DailyTask8.addAction(player -> autoChestClick(player, 15)); 
+            DailyTask8.addAction(new DelayAction(12));
+            DailyTask8.addAction(player -> autoChestClick(player, 10)); 
+            DailyTask8.addAction(player -> autoChestClick(player, 12)); 
+            DailyTask8.addAction(player -> autoChestClick(player, 14)); 
+            DailyTask8.addAction(player -> autoChestClick(player, 16)); 
+            DailyTask8.addAction(player -> autoChestClick(player, 30)); 
+            DailyTask8.addAction(player -> autoChestClick(player, 32)); 
+            DailyTask8.addAction(player -> autoChestClick(player, 40)); 
+            
+            DailyTaskSequence.addStep(DailyTask1a);
+            DailyTaskSequence.addStep(DailyTask1b);
+            DailyTaskSequence.addStep(DailyTask2);
+            DailyTaskSequence.addStep(DailyTask3);
+            DailyTaskSequence.addStep(DailyTask4);
+            DailyTaskSequence.addStep(DailyTask5a);
+            DailyTaskSequence.addStep(DailyTask5b);
+            DailyTaskSequence.addStep(DailyTask5c);
+            DailyTaskSequence.addStep(DailyTask6);
+            DailyTaskSequence.addStep(DailyTask7a);
+            DailyTaskSequence.addStep(DailyTask7b);
+            DailyTaskSequence.addStep(DailyTask7c);
+            DailyTaskSequence.addStep(DailyTask8);
+            
+            pathSequenceManager.addSequence(DailyTaskSequence);
         }
         
+        // 设置角度（与游戏中对应） xxx.addAction(player -> setPlayerViewAngles(player, 66.5f, -46.0f));
+        // 发送聊天内容（可用于发送指令） xxx.addAction(player -> sendChatCommand("/jump"));
+        // 指定坐标方块右键 xxx.addAction(player -> rightClickOnBlock(player, new BlockPos(190, 8, -488)));
+        // 手动添加延迟ticks（20tick = 1s） xxx.addAction(new DelayAction(10));
+        // 指定坐标范围实体右键 xxx.addAction(player -> rightClickOnNearestEntity(player, new BlockPos(100, 65, 200), 3.0)); 
+        // 自动村民交易（第1个交易2次） xxx.addAction(player -> autoVillagerTradeFull(player, 0, 2)); 
+        // 自动箱子GUI点击（第31格） xxx.addAction(player -> autoChestClick(player, 30)); 
+        
         // 设置玩家视角角度
-        private void setPlayerViewAngles(EntityPlayerSP player, float yaw, float pitch) {
+        private static void setPlayerViewAngles(EntityPlayerSP player, float yaw, float pitch) {
             player.rotationYaw = yaw;
             player.rotationPitch = pitch;
             player.rotationYawHead = yaw;
@@ -542,7 +934,7 @@ public class KeyCommandMod {
         }
         
         // 发送聊天命令
-        private void sendChatCommand(String command) {
+        private static void sendChatCommand(String command) {
             if (mc.player != null && !mc.player.isSpectator()) {
                 mc.player.sendChatMessage(command);
                 LOGGER.info("Sent command: " + command);
@@ -550,7 +942,7 @@ public class KeyCommandMod {
         }
         
         // 右键点击方块
-        private void rightClickOnBlock(EntityPlayerSP player, BlockPos pos) {
+        private static void rightClickOnBlock(EntityPlayerSP player, BlockPos pos) {
             EnumFacing facing = EnumFacing.UP;
             Vec3d hitVec = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
             
@@ -559,6 +951,38 @@ public class KeyCommandMod {
             );
             player.swingArm(EnumHand.MAIN_HAND);
             LOGGER.info("Right clicked at: " + pos);
+        }
+        
+        // 右键点击实体
+        private static void rightClickOnNearestEntity(EntityPlayerSP player, BlockPos pos, double range) {
+            Minecraft mc = Minecraft.getMinecraft();
+            double px = pos.getX() + 0.5;
+            double py = pos.getY() + 0.5;
+            double pz = pos.getZ() + 0.5;
+
+            // 查找附近所有实体（不包括玩家自己）
+            Entity nearest = null;
+            double minDistSq = Double.MAX_VALUE;
+            for (Entity entity : mc.world.getEntitiesWithinAABB(
+                    Entity.class,
+                    new AxisAlignedBB(
+                        px - range, py - range, pz - range,
+                        px + range, py + range, pz + range
+                    ))) {
+                if (entity == player) continue;
+                double distSq = entity.getDistanceSq(px, py, pz);
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
+                    nearest = entity;
+                }
+            }
+            if (nearest != null) {
+                mc.playerController.interactWithEntity(player, nearest, EnumHand.MAIN_HAND);
+                player.swingArm(EnumHand.MAIN_HAND);
+                LOGGER.info("Right clicked entity {} at {}", nearest.getName(), pos);
+            } else {
+                LOGGER.warn("No entity found near: " + pos);
+            }
         }
         
         // 延迟动作类
@@ -577,6 +1001,170 @@ public class KeyCommandMod {
         	public int getDelayTicks() {
         	return delayTicks;
         	}
+        }
+        
+        // 自动村民交易类
+        /**
+         * 自动执行指定村民交易，自动补全输入物品并领取交易物品，支持NBT精确匹配
+         * @param tradeIndex    村民交易序号（从0开始）
+         * @param tradeCount    执行多少次该交易
+         */
+        public static void autoVillagerTradeFull(EntityPlayerSP player, int tradeIndex, int tradeCount) {
+            LOGGER.info("当前GUI: " + mc.currentScreen.getClass().getName());
+            LOGGER.info("当前容器: " + player.openContainer.getClass().getName());
+            if (!(mc.currentScreen instanceof GuiMerchant) || tradeCount <= 0) return;
+            GuiMerchant gui = (GuiMerchant) mc.currentScreen;
+            MerchantRecipeList recipes = gui.getMerchant().getRecipes(player);
+
+            if (recipes == null || tradeIndex < 0 || tradeIndex >= recipes.size()) return;
+            MerchantRecipe recipe = recipes.get(tradeIndex);
+            if (recipe == null || recipe.isRecipeDisabled()) return;
+
+            // 反射设置GuiMerchant的currentRecipeIndex（适配开发版和混淆版）
+            try {
+                java.lang.reflect.Field field;
+                try {
+                    // 开发环境名
+                    field = GuiMerchant.class.getDeclaredField("currentRecipeIndex");
+                } catch (NoSuchFieldException e) {
+                    // 混淆名
+                    field = GuiMerchant.class.getDeclaredField("field_147041_z");
+                }
+                field.setAccessible(true);
+                field.setInt(gui, tradeIndex);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            for (int t = 0; t < tradeCount; t++) {
+                // 补全输入物品
+                boolean inputOk = fillMerchantInputsWithNBT(gui, recipe);
+                if (!inputOk) {
+                    LOGGER.warn("背包中缺少交易所需物品（含NBT），无法继续交易");
+                    break;
+                }
+                // 尝试点击输出槽以完成交易
+                Slot outputSlot = gui.inventorySlots.getSlot(2);
+                if (outputSlot != null && outputSlot.getHasStack()) {
+                    int emptySlot = findFirstEmptyInventorySlot(gui);
+                    if (emptySlot >= 0) {
+                        mc.playerController.windowClick(gui.inventorySlots.windowId, 2, 0, ClickType.PICKUP, player);
+                        mc.playerController.windowClick(gui.inventorySlots.windowId, emptySlot, 0, ClickType.PICKUP, player);
+                        clearMerchantInputSlot(gui, 0);
+                        clearMerchantInputSlot(gui, 1);
+                    } else {
+                        LOGGER.warn("背包已满，无法领取交易物品！");
+                        break;
+                    }
+                } else {
+                    // 没有输出物品时，再点击一次触发交易
+                    mc.playerController.windowClick(gui.inventorySlots.windowId, 2, 0, ClickType.PICKUP, player);
+                }
+            }
+            LOGGER.info("自动完成村民交易（含NBT精确匹配），交易序号: " + tradeIndex + "，次数: " + tradeCount);
+        }
+
+        /**
+         * 补全村民交易输入物品（支持1或2输入物品，且匹配NBT标签）
+         * @return 是否成功放入所需数量的输入物品
+         */
+        private static boolean fillMerchantInputsWithNBT(GuiMerchant gui, MerchantRecipe recipe) {
+            // 1. 先清空输入槽（slot 0, slot 1）
+            clearMerchantInputSlot(gui, 0);
+            clearMerchantInputSlot(gui, 1);
+
+            // 2. 放入输入1
+            boolean ok1 = moveItemToInputWithNBT(gui, recipe.getItemToBuy(), 0, recipe.getItemToBuy().getCount());
+            // 3. 放入输入2（如果有）
+            boolean ok2 = true;
+            if (!recipe.getSecondItemToBuy().isEmpty()) {
+                ok2 = moveItemToInputWithNBT(gui, recipe.getSecondItemToBuy(), 1, recipe.getSecondItemToBuy().getCount());
+            }
+            return ok1 && ok2;
+        }
+
+        /**
+         * 从背包移动指定数量物品（含精确NBT）到村民输入槽
+         * @param gui GuiMerchant
+         * @param targetStack 目标物品
+         * @param inputSlot 输入槽号（0或1）
+         * @param neededCount 需要的数量
+         * @return 是否足量成功
+         */
+        private static boolean moveItemToInputWithNBT(GuiMerchant gui, ItemStack targetStack, int inputSlot, int neededCount) {
+            int moved = 0;
+            for (int i = 9; i <= 35; i++) {
+                Slot slot = gui.inventorySlots.getSlot(i);
+                if (slot != null && slot.getHasStack()) {
+                    ItemStack stack = slot.getStack();
+                    if (itemStackNBTEquals(stack, targetStack)) {
+                        int toMove = Math.min(stack.getCount(), neededCount - moved);
+                        for (int j = 0; j < toMove; j++) {
+                            mc.playerController.windowClick(gui.inventorySlots.windowId, i, 0, ClickType.PICKUP, mc.player);
+                            mc.playerController.windowClick(gui.inventorySlots.windowId, inputSlot, 0, ClickType.PICKUP, mc.player);
+                            moved++;
+                            stack = slot.getStack();
+                            if (stack == null || stack.isEmpty()) break;
+                        }
+                    }
+                    if (moved >= neededCount) break;
+                }
+            }
+            return moved >= neededCount;
+        }
+
+        /**
+         * 精确比较两个ItemStack，包括NBT
+         */
+        private static boolean itemStackNBTEquals(ItemStack a, ItemStack b) {
+            if (a == null || b == null) return false;
+            NBTTagCompound nbtA = a.getTagCompound();
+            NBTTagCompound nbtB = b.getTagCompound();
+            if (nbtA == null && nbtB == null) return true;
+            if (nbtA == null || nbtB == null) return false;
+            return nbtA.equals(nbtB);
+        }
+
+        /**
+         * 查找玩家背包中的第一个空槽位
+         * @param gui 当前GuiMerchant
+         * @return 槽位索引（GUI里的），没有空位返回-1
+         */
+        private static int findFirstEmptyInventorySlot(GuiMerchant gui) {
+            for (int i = 9; i <= 35; i++) {
+                Slot slot = gui.inventorySlots.getSlot(i);
+                if (slot != null && !slot.getHasStack()) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        // 清空村民交易输入槽
+        private static void clearMerchantInputSlot(GuiMerchant gui, int slotId) {
+            Slot slot = gui.inventorySlots.getSlot(slotId);
+            if (slot != null && slot.getHasStack()) {
+                mc.playerController.windowClick(gui.inventorySlots.windowId, slotId, 0, ClickType.PICKUP, mc.player);
+                int empty = findFirstEmptyInventorySlot(gui);
+                if (empty >= 0) {
+                    mc.playerController.windowClick(gui.inventorySlots.windowId, empty, 0, ClickType.PICKUP, mc.player);
+                }
+            }
+        }
+        
+        // 自动箱子GUI点击类
+        /**
+         * 自动点击箱子或大箱子GUI的指定格子
+         * @param chestSlotIndex 格子编号（大箱子0-53，小箱子0-26）
+         */
+        public static void autoChestClick(EntityPlayerSP player, int chestSlotIndex) {
+            if (mc.currentScreen instanceof GuiChest) {
+                GuiChest gui = (GuiChest) mc.currentScreen;
+                if (chestSlotIndex >= 0 && chestSlotIndex < gui.inventorySlots.inventorySlots.size()) {
+                    mc.playerController.windowClick(gui.inventorySlots.windowId, chestSlotIndex, 0, ClickType.PICKUP, player);
+                    LOGGER.info("自动点击箱子格子: " + chestSlotIndex);
+                }
+            }
         }
         
         // 路径序列步骤类（支持多操作）
@@ -640,8 +1228,23 @@ public class KeyCommandMod {
             }
         }
         
+        private static void saveLoopConfig(String sequenceName, int loopCount) {
+            try {
+                String json = "{"
+                    + "\"autoLoop\":true,"
+                    + "\"loopSequence\":\"" + sequenceName.replace("\"", "\\\"") + "\","
+                    + "\"loopCount\":" + loopCount
+                    + "}";
+                Path configDir = Paths.get("config");
+                if (!Files.exists(configDir)) Files.createDirectories(configDir);
+                Files.write(Paths.get("config/keycommandmod_autorun.json"), json.getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                LOGGER.error("保存循环配置失败", e);
+            }
+        }
+        
         // 运行路径序列
-        private void runPathSequence(String sequenceName) {
+        public static void runPathSequence(String sequenceName) {
             if (!pathSequenceManager.hasSequence(sequenceName)) {
                 LOGGER.error("未知路径序列: " + sequenceName);
                 return;
@@ -660,10 +1263,15 @@ public class KeyCommandMod {
             if (loopCount != 0) {
                 startNextLoop(sequenceName);
             }
+            
+            // 如果无限循环，则保存自动运行配置
+            if (loopCount == -1) {
+            	saveLoopConfig(sequenceName, loopCount);
+            }
         }
         
         // 开始下一次循环
-        private void startNextLoop(String sequenceName) {
+        private static void startNextLoop(String sequenceName) {
             PathSequence sequence = pathSequenceManager.getSequence(sequenceName);
             
             // 获取路径序列的第一个点
@@ -764,12 +1372,12 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
                       x + 175, y + 165, 0x666666); // 灰色页码文字
 
     // 绘制上一页按钮（下移）
-    drawRect(x + 130, y + 180, x + 150, y + 195, 0xFFDDDDDD);
-    drawCenteredString(fontRenderer, "上一页", x + 140, y + 185, 0x333333);
+    drawRect(x + 190, y + 188, x + 220, y + 200, 0xFFDDDDDD);
+    drawCenteredString(fontRenderer, "上一页", x + 205, y + 190, 0x333333);
 
     // 绘制下一页按钮（下移）
-    drawRect(x + 160, y + 180, x + 180, y + 195, 0xFFDDDDDD);
-    drawCenteredString(fontRenderer, "下一页", x + 170, y + 185, 0x333333);
+    drawRect(x + 220, y + 188, x + 250, y + 200, 0xFFDDDDDD);
+    drawCenteredString(fontRenderer, "下一页", x + 235, y + 190, 0x333333);
 
     // 如果是自动操作分类，显示状态信息
     if (currentCategory.equals("自动操作")) {
@@ -900,8 +1508,8 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
                 }
 
             // 处理上一页按钮
-            if (mouseX >= x + 130 && mouseY >= y + 180 && 
-                mouseX <= x + 150 && mouseY <= y + 195) {
+            if (mouseX >= x + 190 && mouseY >= y + 180 && 
+                mouseX <= x + 220 && mouseY <= y + 200) {
                 if (currentPage > 0) {
                     currentPage--;
                     CATEGORY_PAGE_MAP.put(currentCategory, currentPage);
@@ -911,8 +1519,8 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
             }
 
             // 处理下一页按钮
-            if (mouseX >= x + 160 && mouseY >= y + 180 && 
-                mouseX <= x + 180 && mouseY <= y + 195) {
+            if (mouseX >= x + 220 && mouseY >= y + 180 && 
+                mouseX <= x + 250 && mouseY <= y + 200) {
                 int totalPages = (categoryItems.get(currentCategory).size() + 19) / 20;
                 if (currentPage + 1 < totalPages) {
                     currentPage++;
@@ -982,9 +1590,19 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
                     MinecraftForge.EVENT_BUS.unregister(this);
                     status = "已停止";
                     LOGGER.info("路径跟踪已停止");
+                    clearLoopConfig();
                 }
             }
 
+            private void clearLoopConfig() {
+                try {
+                    Path configPath = Paths.get("config/keycommandmod_autorun.json");
+                    if (Files.exists(configPath)) Files.delete(configPath);
+                } catch (Exception e) {
+                    LOGGER.error("清除循环配置失败", e);
+                }
+            }
+            
             @SubscribeEvent
             public void onPlayerTick(TickEvent.PlayerTickEvent event) {
                 if (!tracking || event.phase != TickEvent.Phase.START || event.side != Side.CLIENT) return;
@@ -1003,23 +1621,24 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
                 // 检查是否完成序列
                 if (currentStepIndex >= steps.size()) {
                     sendChatCommand(".goto cancel");
-                    
-                    // 处理循环逻辑
-                    if (remainingLoops != 0) {
-                        // 无限循环或还有剩余次数
+
+                    if (remainingLoops != 0 || GuiInventory.loopCount < 0) {
                         if (remainingLoops > 0) {
                             remainingLoops--;
                         }
-                        
-                        // 如果还有剩余次数或无限循环
                         if (remainingLoops != 0 || GuiInventory.loopCount < 0) {
                             status = "等待循环...";
-                            
-                            // 注册全局事件监听器
-                            MinecraftForge.EVENT_BUS.unregister(this);
+                            // 关键：重新开始下一轮循环
                             tracking = false;
-                            currentSequence = null;
-                            
+                            MinecraftForge.EVENT_BUS.unregister(this);
+
+                            // 重新启动下一轮循环
+                            // 用调度任务方式避免递归调用
+                            Minecraft.getMinecraft().addScheduledTask(() -> {
+                                if (currentSequence != null) {
+                                    GuiInventory.startNextLoop(currentSequence.getName());
+                                }
+                            });
                             return;
                         } else {
                             // 完成所有循环
@@ -1042,10 +1661,14 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
                     double playerY = player.posY;
                     double playerZ = player.posZ;
                     
+                    double tx = Double.isNaN(target[0]) ? player.posX : target[0];
+                    double ty = Double.isNaN(target[1]) ? player.posY : target[1];
+                    double tz = Double.isNaN(target[2]) ? player.posZ : target[2];
+                    
                     double distanceSq = 
-                        Math.pow(playerX - target[0], 2) +
-                        Math.pow(playerY - target[1], 2) +
-                        Math.pow(playerZ - target[2], 2);
+                        Math.pow(playerX - tx, 2) +
+                        Math.pow(playerY - ty, 2) +
+                        Math.pow(playerZ - tz, 2);
                     
                     if (distanceSq < 4.0) { // 2格距离平方
                         LOGGER.info("到达目标 {} for {}", currentStepIndex, currentSequence.getName());
@@ -1104,7 +1727,7 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
             }
             
             // 发送临时聊天命令（不依赖GUI的sendChatMessage）
-            private void sendChatCommand(String command) {
+            private static void sendChatCommand(String command) {
                 EntityPlayerSP player = Minecraft.getMinecraft().player;
                 if (player != null && !player.isSpectator()) {
                     player.sendChatMessage(command);
@@ -1113,6 +1736,8 @@ public void drawScreen(int mouseX, int mouseY, float partialTicks) {
             }
         }
 
+
+        
         public static class LoopCountInputGui extends GuiScreen {
             private final GuiInventory parent;
             private String inputText = "";

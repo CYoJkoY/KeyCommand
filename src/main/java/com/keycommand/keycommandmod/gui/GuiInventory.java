@@ -236,7 +236,7 @@ public class GuiInventory extends GuiScreen {
         // 新增循环设置按钮(+)
         AutoItems.add("setloop"); AutoItemNames.add("循环次数");
         AutoItems.add("stop"); AutoItemNames.add("停止运行");
-        AutoItems.add("location_config"); AutoItemNames.add("自动返回配置");
+        AutoItems.add("location_config"); AutoItemNames.add("自动返回");
         
         AutoItems.add("path:每日"); AutoItemNames.add("做每日");
         AutoItems.add("path:暴怒"); AutoItemNames.add("跑暴怒");

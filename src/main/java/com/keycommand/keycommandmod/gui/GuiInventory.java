@@ -4,9 +4,9 @@ import com.keycommand.keycommandmod.KeyCommandMod;
 import com.keycommand.keycommandmod.gui.path.PathSequence;
 import com.keycommand.keycommandmod.gui.path.PathSequenceManager;
 import com.keycommand.keycommandmod.gui.path.PathStep;
+import com.keycommand.keycommandmod.handler.AutoLoopHandler;
 import com.keycommand.keycommandmod.handler.PathTrackingListener;
 import com.keycommand.keycommandmod.util.ActionUtils;
-import com.keycommand.keycommandmod.util.ConfigUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
@@ -54,7 +54,7 @@ public class GuiInventory extends GuiScreen {
     // 初始化分类物品
     private void initCategoryItems() {
         // 每日分类
-    	List<String> DailyItems = new ArrayList<>();
+        List<String> DailyItems = new ArrayList<>();
         List<String> DailyItemNames = new ArrayList<>();
         
         DailyItems.add("/res tp zhanbu");DailyItemNames.add("传占卜");
@@ -181,6 +181,12 @@ public class GuiInventory extends GuiScreen {
         TeleportItems.add("/res tp 5");TeleportItemNames.add("传五本");
         TeleportItems.add("/res tp dlz");TeleportItemNames.add("传六本");
         TeleportItems.add("/res tp 7");TeleportItemNames.add("传七本");
+        TeleportItems.add("/res tp 8-1");TeleportItemNames.add("传8-1");
+        TeleportItems.add("/res tp 8-2");TeleportItemNames.add("传8-2");
+        TeleportItems.add("/res tp 8-3");TeleportItemNames.add("传8-3");
+        TeleportItems.add("/res tp 8-4");TeleportItemNames.add("传8-4");
+        TeleportItems.add("/res tp 8-5");TeleportItemNames.add("传8-5");
+        TeleportItems.add("/res tp 8-6");TeleportItemNames.add("传8-6");
         
         TeleportItems.add("/res tp wk");TeleportItemNames.add("传挖矿");
         TeleportItems.add("/res tp wrx");TeleportItemNames.add("传温柔");
@@ -233,7 +239,6 @@ public class GuiInventory extends GuiScreen {
         List<String> AutoItems = new ArrayList<>();
         List<String> AutoItemNames = new ArrayList<>();
         
-        // 新增循环设置按钮(+)
         AutoItems.add("setloop"); AutoItemNames.add("循环次数");
         AutoItems.add("stop"); AutoItemNames.add("停止运行");
         AutoItems.add("location_config"); AutoItemNames.add("自动返回");
@@ -615,55 +620,38 @@ public class GuiInventory extends GuiScreen {
         
         PathStep DailyTask5c = new PathStep(new double[]{190, 18, -569});
         DailyTask5c.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(190, 14, -569)));
-        DailyTask5c.addAction(player -> ActionUtils.sendChatCommand("/res tp 2025ss"));
-        
-        // 限时活动1（鼠鼠）
-        PathStep DailyTask6a = new PathStep(new double[]{Double.NaN, Double.NaN, Double.NaN});
-        DailyTask6a.addAction(new ActionUtils.DelayAction(10));
-        DailyTask6a.addAction(player -> ActionUtils.setPlayerViewAngles(player, -175.6f, 1.5f));
-        DailyTask6a.addAction(new ActionUtils.DelayAction(12));
-        DailyTask6a.addAction(player -> ActionUtils.sendChatCommand("/jump"));
-        DailyTask6a.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(-855, 156, 1305)));
-        DailyTask6a.addAction(player -> ActionUtils.sendChatCommand("/res tp 2024gqj1"));
-        
-        // 限时活动2（军衔）
-        PathStep DailyTask6b = new PathStep(new double[]{582, 65, 1057});
-        DailyTask6b.addAction(new ActionUtils.DelayAction(10));
-        DailyTask6b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(581, 66, 1061)));
-        DailyTask6b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(581, 66, 1057)));
-        DailyTask6b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(581, 66, 1053)));
-        DailyTask6b.addAction(player -> ActionUtils.sendChatCommand("/res tp wrx3"));
+        DailyTask5c.addAction(player -> ActionUtils.sendChatCommand("/res tp wrx3"));
         
         // 温柔乡
-        PathStep DailyTask7a = new PathStep(new double[]{262, 83, 123});
-        DailyTask7a.addAction(new ActionUtils.DelayAction(10));
-        DailyTask7a.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(259, 84, 123)));
-        DailyTask7a.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(261, 84, 120)));
+        PathStep DailyTask6a = new PathStep(new double[]{262, 83, 123});
+        DailyTask6a.addAction(new ActionUtils.DelayAction(10));
+        DailyTask6a.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(259, 84, 123)));
+        DailyTask6a.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(261, 84, 120)));
         
-        PathStep DailyTask7b = new PathStep(new double[]{268, 83, 134});
-        DailyTask7b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(271, 84, 131)));
-        DailyTask7b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(269, 84, 138)));
+        PathStep DailyTask6b = new PathStep(new double[]{268, 83, 134});
+        DailyTask6b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(271, 84, 131)));
+        DailyTask6b.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(269, 84, 138)));
         
-        PathStep DailyTask7c = new PathStep(new double[]{262, 83, 134});
-        DailyTask7c.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(262, 84, 138)));
+        PathStep DailyTask6c = new PathStep(new double[]{262, 83, 134});
+        DailyTask6c.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(262, 84, 138)));
         
         // 菜单每日
-        PathStep DailyTask8 = new PathStep(new double[]{Double.NaN, Double.NaN, Double.NaN});
-        DailyTask8.addAction(player -> ActionUtils.sendChatCommand("/menu"));
-        DailyTask8.addAction(new ActionUtils.DelayAction(20));
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 9)); 
-        DailyTask8.addAction(new ActionUtils.DelayAction(12));
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 13)); 
-        DailyTask8.addAction(new ActionUtils.DelayAction(12));
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 15)); 
-        DailyTask8.addAction(new ActionUtils.DelayAction(12));
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 10)); 
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 12)); 
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 14)); 
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 16)); 
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 30)); 
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 32)); 
-        DailyTask8.addAction(player -> ActionUtils.autoChestClick(player, 40)); 
+        PathStep DailyTask7 = new PathStep(new double[]{Double.NaN, Double.NaN, Double.NaN});
+        DailyTask7.addAction(player -> ActionUtils.sendChatCommand("/menu"));
+        DailyTask7.addAction(new ActionUtils.DelayAction(20));
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 9)); 
+        DailyTask7.addAction(new ActionUtils.DelayAction(12));
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 13)); 
+        DailyTask7.addAction(new ActionUtils.DelayAction(12));
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 15)); 
+        DailyTask7.addAction(new ActionUtils.DelayAction(12));
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 10)); 
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 12)); 
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 14)); 
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 16)); 
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 30)); 
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 32)); 
+        DailyTask7.addAction(player -> ActionUtils.autoChestClick(player, 40)); 
         
         DailyTaskSequence.addStep(DailyTask1a);
         DailyTaskSequence.addStep(DailyTask1b);
@@ -675,17 +663,16 @@ public class GuiInventory extends GuiScreen {
         DailyTaskSequence.addStep(DailyTask5c);
         DailyTaskSequence.addStep(DailyTask6a);
         DailyTaskSequence.addStep(DailyTask6b);
-        DailyTaskSequence.addStep(DailyTask7a);
-        DailyTaskSequence.addStep(DailyTask7b);
-        DailyTaskSequence.addStep(DailyTask7c);
-        DailyTaskSequence.addStep(DailyTask8);
+        DailyTaskSequence.addStep(DailyTask6c);
+        DailyTaskSequence.addStep(DailyTask7);
         
         pathSequenceManager.addSequence(DailyTaskSequence);
     }
 
     // 尝试自动启动循环
     public static void tryAutoStartLoop() {
-        ConfigUtils.AutoLoopConfig config = ConfigUtils.readAutoLoopConfig();
+        // 使用AutoLoopHandler读取配置
+        AutoLoopHandler.AutoLoopConfig config = AutoLoopHandler.getInstance().readAutoLoopConfig();
         if (config.isAutoLoop() && !config.getLoopSequence().isEmpty() && config.getLoopCount() == -1) {
             KeyCommandMod.LOGGER.info("检测到需要自动无限循环执行：" + config.getLoopSequence());
             mc.addScheduledTask(() -> {
@@ -717,8 +704,8 @@ public class GuiInventory extends GuiScreen {
             startNextLoop(sequenceName);
         }
 
-        if (loopCount == -1) {
-            ConfigUtils.saveAutoLoopConfig(sequenceName, loopCount);
+        if (loopCount <= -1) {
+            AutoLoopHandler.getInstance().saveAutoLoopConfig(sequenceName, loopCount);
         }
     }
 
@@ -792,7 +779,7 @@ public class GuiInventory extends GuiScreen {
 
         // 绘制自动操作状态
         if (currentCategory.equals("自动操作")) {
-            String loopSetting = "循环设置: " + (loopCount == -1 ? "无限循环" : (loopCount == 0 ? "单次执行" : loopCount + "次"));
+            String loopSetting = "循环设置: " + (loopCount <= -1 ? "无限循环" : (loopCount == 0 ? "单次执行" : loopCount + "次"));
             fontRenderer.drawStringWithShadow(loopSetting, x + 55, y + 180, 0x55FFFF);
             String statusText = "状态: " + (PathTrackingListener.getInstance().isTracking() ? PathTrackingListener.getInstance().getStatus() : (isLooping ? "运行中" : "就绪"));
             fontRenderer.drawStringWithShadow(statusText, x + 55, y + 190, 0xFFFF55);
@@ -866,7 +853,8 @@ public class GuiInventory extends GuiScreen {
                         } else if (command.equals("location_config")) {
                             mc.displayGuiScreen(new LocationConfigGui(this));
                             return;
-                        }
+                        } 
+                        
                     } else {
                         ActionUtils.sendChatCommand(command);
                         mc.displayGuiScreen(null);

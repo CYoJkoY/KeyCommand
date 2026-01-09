@@ -5,7 +5,6 @@ import com.keycommand.keycommandmod.gui.GuiInventory;
 import com.keycommand.keycommandmod.gui.path.PathSequence;
 import com.keycommand.keycommandmod.gui.path.PathStep;
 import com.keycommand.keycommandmod.util.ActionUtils;
-import com.keycommand.keycommandmod.util.ConfigUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -57,7 +56,7 @@ public class PathTrackingListener {
             this.currentSequence = null;
             status = "已停止";
             KeyCommandMod.LOGGER.info("路径跟踪已停止");
-            ConfigUtils.clearAutoLoopConfig();
+            AutoLoopHandler.getInstance().clearAutoLoopConfig();
         }
     }
 

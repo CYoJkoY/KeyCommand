@@ -1,5 +1,7 @@
 package com.keycommand.keycommandmod.util;
 
+import java.util.function.Consumer;
+
 // 设置角度（与游戏中对应）XXX.addAction(player -> ActionUtils.setPlayerViewAngles(player, 66.5f, -46.0f));
 // 发送聊天内容（可用于发送指令） XXX.addAction(player -> ActionUtils.sendChatCommand("/jump"));
 // 指定坐标方块右键 XXX.addAction(player -> ActionUtils.rightClickOnBlock(player, new BlockPos(190, 8, -488)));
@@ -12,6 +14,8 @@ import com.keycommand.keycommandmod.KeyCommandMod;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.GuiMerchant;
+import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.entity.Entity;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.Slot;
@@ -24,14 +28,11 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.village.MerchantRecipe;
 import net.minecraft.village.MerchantRecipeList;
-import net.minecraft.client.gui.GuiMerchant;
-import net.minecraft.client.gui.inventory.GuiChest;
-
-import java.util.function.Consumer;
 
 public class ActionUtils {
-    /*
-     *  设置玩家视角角度
+    /* ■■■■■■■■■■■■■■
+     * 设置玩家视角角度
+     * ■■■■■■■■■■■■■■
      */
     public static void setPlayerViewAngles(EntityPlayerSP player, float yaw, float pitch) {
         player.rotationYaw = yaw;
@@ -42,8 +43,9 @@ public class ActionUtils {
         KeyCommandMod.LOGGER.info("Set player view angles: yaw={}, pitch={}", yaw, pitch);
     }
 
-    /*
+    /* ■■■■■■■■■■
      * 发送聊天命令
+     * ■■■■■■■■■■
      */
     public static void sendChatCommand(String command) {
         EntityPlayerSP player = Minecraft.getMinecraft().player;
@@ -53,8 +55,9 @@ public class ActionUtils {
         }
     }
 
-    /*
+    /* ■■■■■■■■■■■
      * 右键点击方块
+     * ■■■■■■■■■■■
      */
     public static void rightClickOnBlock(EntityPlayerSP player, BlockPos pos) {
         EnumFacing facing = EnumFacing.UP;
@@ -64,8 +67,9 @@ public class ActionUtils {
         KeyCommandMod.LOGGER.info("Right clicked at: " + pos);
     }
 
-    /*
+    /* ■■■■■■■■■■■■■■
      * 右键点击附近实体
+     * ■■■■■■■■■■■■■■
      */
     public static void rightClickOnNearestEntity(EntityPlayerSP player, BlockPos pos, double range) {
         double px = pos.getX() + 0.5;
@@ -92,8 +96,9 @@ public class ActionUtils {
         }
     }
 
-    /*
+    /* ■■■■■■■
      * 延迟动作
+     * ■■■■■■■
      */
     public static class DelayAction implements Consumer<EntityPlayerSP> {
         private final int delayTicks;
@@ -110,8 +115,9 @@ public class ActionUtils {
         }
     }
 
-    /*
+    /* ■■■■■■■■■■
      * 自动村民交易
+     * ■■■■■■■■■■
      */
     public static void autoVillagerTradeFull(EntityPlayerSP player, int tradeIndex, int tradeCount) {
         Minecraft mc = Minecraft.getMinecraft();
@@ -232,8 +238,9 @@ public class ActionUtils {
         }
     }
 
-    /*
+    /* ■■■■■■■■■■■■■■
      * 自动点击箱子格子
+     * ■■■■■■■■■■■■■■
      */
     public static void autoChestClick(EntityPlayerSP player, int chestSlotIndex) {
         Minecraft mc = Minecraft.getMinecraft();

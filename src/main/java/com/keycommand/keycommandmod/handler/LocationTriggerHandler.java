@@ -1,6 +1,7 @@
 package com.keycommand.keycommandmod.handler;
 
 import com.keycommand.keycommandmod.KeyCommandMod;
+import com.keycommand.keycommandmod.util.ConfigUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraftforge.common.MinecraftForge;
@@ -8,10 +9,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.Properties;
 
 /**
@@ -35,7 +32,7 @@ public class LocationTriggerHandler {
     // 状态变量（移除了未使用的hasExecutedRepeat）
     private boolean hasExecutedInitial = false;
     private int ticksInArea = 0;
-    private static final String CONFIG_FILE = "config/keycommandmod_location.cfg"; // 配置文件路径
+    private static final String CONFIG_FILE = "location_trigger.cfg"; // 配置文件名称（位于config/Keycommand目录）
 
     private LocationTriggerHandler() {}
 
@@ -49,7 +46,7 @@ public class LocationTriggerHandler {
     public void init() {
         loadConfig(); // 加载配置
         MinecraftForge.EVENT_BUS.register(this); // 注册事件
-        KeyCommandMod.LOGGER.info("LocationTriggerHandler 初始化完成，配置文件路径: {}", CONFIG_FILE);
+        KeyCommandMod.LOGGER.info("LocationTriggerHandler 初始化完成，配置文件路径: config/Keycommand/{}", CONFIG_FILE);
     }
 
     /**
@@ -118,34 +115,36 @@ public class LocationTriggerHandler {
      * 加载配置文件
      */
     public void loadConfig() {
-        File configFile = new File(CONFIG_FILE);
-        // 配置文件不存在则创建默认配置
-        if (!configFile.exists()) {
+        // 创建默认配置属性
+        Properties defaultProps = new Properties();
+        defaultProps.setProperty("enabled", "true");
+        defaultProps.setProperty("triggerX", "0.0");
+        defaultProps.setProperty("triggerY", "0.0");
+        defaultProps.setProperty("triggerZ", "0.0");
+        defaultProps.setProperty("triggerRadius", "3.0");
+        defaultProps.setProperty("initialDelayTicks", "20");
+        defaultProps.setProperty("repeatIntervalTicks", "200");
+
+        // 使用ConfigUtils读取配置
+        Properties props = ConfigUtils.readPropertiesConfig(CONFIG_FILE, defaultProps);
+
+        // 读取配置项（带默认值）
+        enabled = Boolean.parseBoolean(props.getProperty("enabled", "true"));
+        triggerX = Double.parseDouble(props.getProperty("triggerX", "0.0"));
+        triggerY = Double.parseDouble(props.getProperty("triggerY", "0.0"));
+        triggerZ = Double.parseDouble(props.getProperty("triggerZ", "0.0"));
+        triggerRadius = Double.parseDouble(props.getProperty("triggerRadius", "3.0"));
+        initialDelayTicks = Integer.parseInt(props.getProperty("initialDelayTicks", "20"));
+        repeatIntervalTicks = Integer.parseInt(props.getProperty("repeatIntervalTicks", "200"));
+
+        // 如果配置文件不存在，则创建默认配置
+        if (!ConfigUtils.propertiesConfigExists(CONFIG_FILE)) {
             saveConfig();
             KeyCommandMod.LOGGER.info("位置触发配置文件不存在，已创建默认配置");
-            return;
         }
 
-        Properties props = new Properties();
-        try (FileReader reader = new FileReader(configFile)) {
-            props.load(reader);
-
-            // 读取配置项（带默认值）
-            enabled = Boolean.parseBoolean(props.getProperty("enabled", "true"));
-            triggerX = Double.parseDouble(props.getProperty("triggerX", "0.0"));
-            triggerY = Double.parseDouble(props.getProperty("triggerY", "0.0"));
-            triggerZ = Double.parseDouble(props.getProperty("triggerZ", "0.0"));
-            triggerRadius = Double.parseDouble(props.getProperty("triggerRadius", "3.0"));
-            initialDelayTicks = Integer.parseInt(props.getProperty("initialDelayTicks", "20"));
-            repeatIntervalTicks = Integer.parseInt(props.getProperty("repeatIntervalTicks", "200"));
-
-            KeyCommandMod.LOGGER.info("位置触发配置加载成功：启用={}, 触发位置({},{},{}), 半径={}",
-                    enabled, triggerX, triggerY, triggerZ, triggerRadius);
-        } catch (IOException e) {
-            KeyCommandMod.LOGGER.error("加载位置触发配置失败", e);
-        } catch (NumberFormatException e) {
-            KeyCommandMod.LOGGER.error("配置文件格式错误，使用默认值", e);
-        }
+        KeyCommandMod.LOGGER.info("位置触发配置加载成功：启用={}, 触发位置({},{},{}), 半径={}",
+                enabled, triggerX, triggerY, triggerZ, triggerRadius);
     }
 
     /**
@@ -162,21 +161,8 @@ public class LocationTriggerHandler {
         props.setProperty("initialDelayTicks", String.valueOf(initialDelayTicks));
         props.setProperty("repeatIntervalTicks", String.valueOf(repeatIntervalTicks));
 
-        try {
-            File configFile = new File(CONFIG_FILE);
-            // 创建配置文件所在目录
-            if (!configFile.getParentFile().exists()) {
-                configFile.getParentFile().mkdirs();
-            }
-
-            // 写入配置文件
-            try (FileWriter writer = new FileWriter(configFile)) {
-                props.store(writer, "KeyCommandMod Location Trigger Configuration");
-            }
-            KeyCommandMod.LOGGER.info("位置触发配置保存成功");
-        } catch (IOException e) {
-            KeyCommandMod.LOGGER.error("保存位置触发配置失败", e);
-        }
+        // 使用ConfigUtils保存配置
+        ConfigUtils.savePropertiesConfig(CONFIG_FILE, props, "KeyCommandMod Location Trigger Configuration");
     }
 
     // ========== 配置项的Getter/Setter（用于外部修改配置） ==========
